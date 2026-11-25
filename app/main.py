@@ -104,6 +104,7 @@ async def executar_busca(
             "amostras": normalizados,
             "status_nbr": avaliar_grau_nbr14653(validas),
             "filtros": params.model_dump(),
+            "diagnostico": scraper.diagnostico,
         },
     )
 

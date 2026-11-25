@@ -34,6 +34,9 @@ class OLXScraper(BaseScraper):
         "LOCACAO": "aluguel",
     }
 
+    def __init__(self):
+        self.diagnostico: list[str] = []
+
     def _montar_url(self, params: BuscaImovelInput, pagina: int) -> str:
         uf = params.uf.lower().strip()
         tipo = self.TIPO_SLUGS.get(params.tipo_imovel, "apartamentos")
@@ -141,6 +144,7 @@ class OLXScraper(BaseScraper):
                 try:
                     resp = await client.get(url)
                     if resp.status_code != 200:
+                        self.diagnostico.append(f"Página {pagina}: OLX respondeu HTTP {resp.status_code}")
                         break
                     soup = BeautifulSoup(resp.text, "lxml")
                     itens = self._extrair_de_next_data(soup)
@@ -148,6 +152,9 @@ class OLXScraper(BaseScraper):
                         itens = self._extrair_de_html_cards(soup)
 
                     if not itens:
+                        self.diagnostico.append(
+                            f"Página {pagina}: HTTP 200, mas nenhum anúncio encontrado no HTML ({len(resp.text)} bytes)"
+                        )
                         break
 
                     for item in itens:
@@ -159,7 +166,8 @@ class OLXScraper(BaseScraper):
                         coletados.append(item)
 
                     await asyncio.sleep(1.5)
-                except Exception:
+                except Exception as exc:
+                    self.diagnostico.append(f"Página {pagina}: erro {type(exc).__name__}: {exc}")
                     break
 
         return coletados

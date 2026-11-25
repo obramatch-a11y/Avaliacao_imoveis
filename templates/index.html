@@ -171,6 +171,7 @@
     {% elif filtros %}
     <section class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm">
       Nenhuma amostra retornada para esses filtros (ou o portal bloqueou temporariamente a requisição do servidor). Tente ampliar o filtro ou rodar localmente.
+      {% if diagnostico %}<ul class="mt-2 font-mono text-xs">{% for d in diagnostico %}<li>{{ d }}</li>{% endfor %}</ul>{% endif %}
     </section>
     {% endif %}
   </main>
