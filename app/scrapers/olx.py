@@ -37,6 +37,7 @@ class OLXScraper(BaseScraper):
 
     def __init__(self):
         self.diagnostico: list[str] = []
+        self.debug: dict = {"urls": [], "parser": [], "amostra_bruta": [], "trecho_html": ""}
 
     ALUGUEL_RE = re.compile(
         r"\b(aluga-?se|alugo|aluguel|alugar|para alugar|loca[cç][aã]o|locar)\b", re.IGNORECASE
@@ -218,9 +219,18 @@ class OLXScraper(BaseScraper):
                     alvo = modelo_api.replace("{url}", quote(url, safe="")) if modelo_api else url
                     resp = await client.get(alvo)
                     itens: list[dict] = []
+                    self.debug["urls"].append(url)
                     if resp.status_code == 200:
                         soup = BeautifulSoup(resp.text, "lxml")
-                        itens = self._extrair_de_next_data(soup) or self._extrair_de_html_cards(soup)
+                        itens = self._extrair_de_next_data(soup)
+                        parser = "next_data"
+                        if not itens:
+                            itens = self._extrair_de_html_cards(soup)
+                            parser = "html_cards"
+                        self.debug["parser"].append(f"pagina {pagina}: {parser} ({len(itens)} itens)")
+                        if not self.debug["amostra_bruta"]:
+                            self.debug["amostra_bruta"] = itens[:3]
+                            self.debug["trecho_html"] = resp.text[:1500]
                     else:
                         self.diagnostico.append(f"Página {pagina}: OLX respondeu HTTP {resp.status_code}")
 

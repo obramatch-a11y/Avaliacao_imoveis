@@ -41,6 +41,31 @@ async def home(request: Request):
     )
 
 
+@app.get("/debug-olx")
+async def debug_olx(
+    uf: str = "PE",
+    cidade: str = "Jaboatão dos Guararapes",
+    bairro: str = "",
+    tipo_imovel: str = "APARTAMENTO",
+    finalidade: str = "VENDA",
+):
+    """Diagnóstico: mostra o que o OLX devolveu e como o app leu os campos (1 página)."""
+    params = BuscaImovelInput(
+        uf=uf, cidade=cidade, bairro=bairro,
+        finalidade=finalidade,  # type: ignore
+        tipo_imovel=tipo_imovel,  # type: ignore
+        limite_paginas=1,
+    )
+    scraper = OLXScraper()
+    brutos = await scraper.buscar(params)
+    return {
+        "total": len(brutos),
+        "diagnostico": scraper.diagnostico,
+        "debug": scraper.debug,
+        "primeiros_normalizados": brutos[:3],
+    }
+
+
 @app.get("/buscar")
 async def buscar_get():
     return RedirectResponse(url="/", status_code=303)
