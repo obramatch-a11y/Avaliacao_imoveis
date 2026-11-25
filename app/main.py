@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from app.exporter import gerar_csv_sisdea
 from app.models import AmostraSISDEA, BuscaImovelInput
@@ -39,6 +39,11 @@ async def home(request: Request):
             "filtros": {},
         },
     )
+
+
+@app.get("/buscar")
+async def buscar_get():
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.post("/buscar", response_class=HTMLResponse)
