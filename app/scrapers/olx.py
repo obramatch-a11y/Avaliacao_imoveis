@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import re
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus
 import httpx
 from bs4 import BeautifulSoup
 from app.models import BuscaImovelInput
@@ -138,14 +138,18 @@ class OLXScraper(BaseScraper):
         # Proxy residencial opcional (ex.: http://usuario:senha@host:porta), definido no Render
         proxy_url = os.getenv("OLX_PROXY_URL") or None
         verificar_ssl = os.getenv("OLX_PROXY_VERIFY_SSL", "true").lower() != "false"
-        if not proxy_url:
+        # API de scraping opcional: modelo de URL com {url}, ex.:
+        # https://api.scrapingant.com/v2/general?url={url}&x-api-key=CHAVE&proxy_country=BR
+        modelo_api = os.getenv("OLX_FETCH_TEMPLATE") or None
+        if not proxy_url and not modelo_api:
             self.diagnostico.append(
-                "Sem proxy configurado (OLX_PROXY_URL): o OLX costuma bloquear servidores em nuvem."
+                "Sem proxy/API configurado (OLX_FETCH_TEMPLATE ou OLX_PROXY_URL): "
+                "o OLX costuma bloquear servidores em nuvem."
             )
 
         async with httpx.AsyncClient(
             headers=self.HEADERS,
-            timeout=60.0 if proxy_url else 20.0,
+            timeout=90.0 if (proxy_url or modelo_api) else 20.0,
             follow_redirects=True,
             proxy=proxy_url,
             verify=verificar_ssl,
@@ -153,7 +157,8 @@ class OLXScraper(BaseScraper):
             for pagina in range(1, params.limite_paginas + 1):
                 url = self._montar_url(params, pagina)
                 try:
-                    resp = await client.get(url)
+                    alvo = modelo_api.replace("{url}", quote(url, safe="")) if modelo_api else url
+                    resp = await client.get(alvo)
                     if resp.status_code != 200:
                         self.diagnostico.append(f"Página {pagina}: OLX respondeu HTTP {resp.status_code}")
                         break
