@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coletor SISDEA Web — Pesquisa de Mercado Imobiliário</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <header class="bg-slate-900 text-white py-4 px-6 shadow">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div>
+        <h1 class="text-xl font-bold tracking-tight">Coletor SISDEA Web</h1>
+        <p class="text-xs text-slate-300">Amostragem de mercado padronizada (ABNT NBR 14653-2)</p>
+      </div>
+      <span class="text-xs bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-full">
+        MVP v0.1 • Exportação CSV
+      </span>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <h2 class="text-base font-semibold text-slate-800 mb-4">1. Parâmetros do Imóvel Avaliando</h2>
+      <form action="/buscar" method="post" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">UF *</label>
+          <input type="text" name="uf" maxlength="2" required placeholder="AL"
+                 value="{{ filtros.get('uf', 'AL') }}"
+                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm uppercase" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Cidade *</label>
+          <input type="text" name="cidade" required placeholder="Maceió"
+                 value="{{ filtros.get('cidade', '') }}"
+                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Bairro (opcional)</label>
+          <input type="text" name="bairro" placeholder="Pajuçara"
+                 value="{{ filtros.get('bairro', '') }}"
+                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Tipo de Imóvel</label>
+          <select name="tipo_imovel" class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm">
+            {% for tipo in ["APARTAMENTO", "CASA", "TERRENO", "COMERCIAL"] %}
+              <option value="{{ tipo }}" {% if filtros.get('tipo_imovel') == tipo %}selected{% endif %}>{{ tipo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Finalidade</label>
+          <select name="finalidade" class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm">
+            <option value="VENDA" {% if filtros.get('finalidade') == 'VENDA' %}selected{% endif %}>VENDA (Oferta)</option>
+            <option value="LOCACAO" {% if filtros.get('finalidade') == 'LOCACAO' %}selected{% endif %}>LOCAÇÃO (Oferta)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Área Mínima (m²)</label>
+          <input type="number" step="0.01" name="area_min" placeholder="Ex: 50"
+                 value="{{ filtros.get('area_min') or '' }}"
+                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Área Máxima (m²)</label>
+          <input type="number" step="0.01" name="area_max" placeholder="Ex: 120"
+                 value="{{ filtros.get('area_max') or '' }}"
+                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Quartos (mín.) / Páginas</label>
+          <div class="flex gap-2">
+            <input type="number" name="quartos_min" placeholder="Quartos"
+                   value="{{ filtros.get('quartos_min') or '' }}"
+                   class="w-1/2 rounded-lg border-slate-300 border px-3 py-2 text-sm" />
+            <select name="limite_paginas" class="w-1/2 rounded-lg border-slate-300 border px-2 py-2 text-sm">
+              <option value="1">1 pág.</option>
+              <option value="2" selected>2 págs.</option>
+              <option value="3">3 págs.</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="sm:col-span-2 lg:col-span-4 flex justify-end pt-2">
+          <button type="submit"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-5 py-2.5 rounded-lg shadow-sm transition">
+            Coletar Amostras Agora
+          </button>
+        </div>
+      </form>
+    </section>
+
+    {% if amostras is not none and amostras|length > 0 %}
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h2 class="text-base font-semibold text-slate-800">
+            2. Curadoria da Amostra ({{ amostras|length }} imóveis coletados)
+          </h2>
+          {% if status_nbr %}
+            <p class="text-xs text-slate-600 mt-0.5">{{ status_nbr }}</p>
+          {% endif %}
+        </div>
+
+        <form id="formExport" action="/exportar-csv" method="post" class="flex flex-wrap gap-2">
+          <button type="submit" name="modo" value="completo"
+                  class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2 rounded-lg">
+            Baixar CSV Completo (com URLs)
+          </button>
+          <button type="submit" name="modo" value="numerico"
+                  class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-4 py-2 rounded-lg">
+            Baixar CSV Numérico (SISDEA)
+          </button>
+        </form>
+      </div>
+
+      <div class="overflow-x-auto border border-slate-200 rounded-lg">
+        <table class="min-w-full text-xs text-left">
+          <thead class="bg-slate-100 text-slate-700 uppercase">
+            <tr>
+              <th class="p-2.5">Usar</th>
+              <th class="p-2.5">Status</th>
+              <th class="p-2.5">Bairro</th>
+              <th class="p-2.5">Valor (R$)</th>
+              <th class="p-2.5">Área (m²)</th>
+              <th class="p-2.5">R$/m²</th>
+              <th class="p-2.5">Qts</th>
+              <th class="p-2.5">Vagas</th>
+              <th class="p-2.5">Andar</th>
+              <th class="p-2.5">Elev.</th>
+              <th class="p-2.5">Pisc.</th>
+              <th class="p-2.5">Link</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            {% for a in amostras %}
+            <tr class="hover:bg-slate-50 {% if a.alerta_saneamento != 'OK' %}bg-amber-50/60{% endif %}">
+              <td class="p-2.5">
+                <input type="checkbox" form="formExport" name="ids_selecionados" value="{{ a.id_amostra }}"
+                       {% if a.alerta_saneamento == 'OK' %}checked{% endif %} />
+              </td>
+              <td class="p-2.5 font-medium">
+                {% if a.alerta_saneamento == 'OK' %}
+                  <span class="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">OK</span>
+                {% else %}
+                  <span class="text-amber-800 bg-amber-200 px-2 py-0.5 rounded">{{ a.alerta_saneamento }}</span>
+                {% endif %}
+              </td>
+              <td class="p-2.5">{{ a.bairro }}</td>
+              <td class="p-2.5 font-semibold">{{ a.valor_oferta or '-' }}</td>
+              <td class="p-2.5">{{ a.area_m2 or '-' }}</td>
+              <td class="p-2.5">{{ a.valor_m2 or '-' }}</td>
+              <td class="p-2.5">{{ a.quartos or '-' }}</td>
+              <td class="p-2.5">{{ a.vagas }}</td>
+              <td class="p-2.5">{{ a.andar if a.andar is not none else '-' }}</td>
+              <td class="p-2.5">{{ a.elevador }}</td>
+              <td class="p-2.5">{{ a.piscina }}</td>
+              <td class="p-2.5">
+                {% if a.url_anuncio %}
+                  <a href="{{ a.url_anuncio }}" target="_blank" class="text-blue-600 underline">Abrir</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% elif filtros %}
+    <section class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm">
+      Nenhuma amostra retornada para esses filtros (ou o portal bloqueou temporariamente a requisição do servidor). Tente ampliar o filtro ou rodar localmente.
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
