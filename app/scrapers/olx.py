@@ -54,15 +54,27 @@ class OLXScraper(BaseScraper):
             return not (tem_aluguel and not tem_venda)
         return not (tem_venda and not tem_aluguel)
 
-    def _montar_url(self, params: BuscaImovelInput, pagina: int) -> str:
+    @staticmethod
+    def _slug(texto: str) -> str:
+        t = remover_acentos(texto or "").lower().strip()
+        return re.sub(r"[^a-z0-9]+", "-", t).strip("-")
+
+    def _montar_url(self, params: BuscaImovelInput, pagina: int, modo: str = "caminho") -> str:
         uf = params.uf.lower().strip()
         tipo = self.TIPO_SLUGS.get(params.tipo_imovel, "apartamentos")
         fin = self.FINALIDADE_SLUGS.get(params.finalidade, "venda")
+        base = f"https://www.olx.com.br/imoveis/{fin}/{tipo}/estado-{uf}"
 
-        termo_busca = f"{params.cidade} {params.bairro or ''}".strip()
-        q = quote_plus(remover_acentos(termo_busca))
+        if modo == "caminho":
+            # Cidade (e bairro) no caminho, como o próprio OLX faz
+            url = f"{base}/{self._slug(params.cidade)}"
+            if params.bairro:
+                url += f"/{self._slug(params.bairro)}"
+            url += f"?o={pagina}"
+        else:
+            termo_busca = f"{params.cidade} {params.bairro or ''}".strip()
+            url = f"{base}?q={quote_plus(remover_acentos(termo_busca))}&o={pagina}"
 
-        url = f"https://www.olx.com.br/imoveis/{fin}/{tipo}/estado-{uf}?q={q}&o={pagina}"
         if params.area_min:
             url += f"&ss={int(params.area_min)}"
         if params.area_max:
@@ -70,6 +82,16 @@ class OLXScraper(BaseScraper):
         if params.quartos_min:
             url += f"&ros={int(params.quartos_min)}"
         return url
+
+    def _local_confere(self, item: dict, params: BuscaImovelInput) -> bool:
+        """Descarta anúncios de outra cidade/bairro quando o OLX informa o local."""
+        cidade = self._slug(item.get("cidade", ""))
+        if cidade and cidade != self._slug(params.cidade):
+            return False
+        bairro = self._slug(item.get("bairro", ""))
+        if params.bairro and bairro and bairro != self._slug(params.bairro):
+            return False
+        return True
 
     def _extrair_de_next_data(self, soup: BeautifulSoup) -> list[dict]:
         script = soup.find("script", id="__NEXT_DATA__")
@@ -95,6 +117,7 @@ class OLXScraper(BaseScraper):
                         "fonte": self.nome_fonte,
                         "titulo": ad.get("subject", ""),
                         "preco": ad.get("price", ""),
+                        "cidade": ad.get("locationDetails", {}).get("municipality", ""),
                         "bairro": ad.get("locationDetails", {}).get("neighbourhood", ""),
                         "area": propriedades.get("size", ""),
                         "quartos": propriedades.get("rooms", ""),
@@ -170,30 +193,39 @@ class OLXScraper(BaseScraper):
             proxy=proxy_url,
             verify=verificar_ssl,
         ) as client:
-            for pagina in range(1, params.limite_paginas + 1):
-                url = self._montar_url(params, pagina)
+            modo = "caminho"
+            pagina = 1
+            while pagina <= params.limite_paginas:
+                url = self._montar_url(params, pagina, modo)
                 try:
                     alvo = modelo_api.replace("{url}", quote(url, safe="")) if modelo_api else url
                     resp = await client.get(alvo)
-                    if resp.status_code != 200:
+                    itens: list[dict] = []
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, "lxml")
+                        itens = self._extrair_de_next_data(soup) or self._extrair_de_html_cards(soup)
+                    else:
                         self.diagnostico.append(f"Página {pagina}: OLX respondeu HTTP {resp.status_code}")
-                        break
-                    soup = BeautifulSoup(resp.text, "lxml")
-                    itens = self._extrair_de_next_data(soup)
-                    if not itens:
-                        itens = self._extrair_de_html_cards(soup)
 
                     if not itens:
-                        self.diagnostico.append(
-                            f"Página {pagina}: HTTP 200, mas nenhum anúncio encontrado no HTML ({len(resp.text)} bytes)"
-                        )
+                        if pagina == 1 and modo == "caminho":
+                            modo = "texto"  # tenta de novo com busca por texto
+                            continue
+                        if resp.status_code == 200:
+                            self.diagnostico.append(
+                                f"Página {pagina}: HTTP 200, mas nenhum anúncio encontrado ({len(resp.text)} bytes)"
+                            )
                         break
 
                     antes = len(itens)
-                    itens = [i for i in itens if self._bate_finalidade(i, params.finalidade)]
+                    itens = [
+                        i for i in itens
+                        if self._bate_finalidade(i, params.finalidade) and self._local_confere(i, params)
+                    ]
                     if antes != len(itens):
                         self.diagnostico.append(
-                            f"Página {pagina}: {antes - len(itens)} anúncio(s) descartado(s) por não serem de {params.finalidade}"
+                            f"Página {pagina}: {antes - len(itens)} anúncio(s) descartado(s) "
+                            f"(finalidade ou local diferente do pedido)"
                         )
 
                     for item in itens:
@@ -204,6 +236,7 @@ class OLXScraper(BaseScraper):
                             urls_vistas.add(link)
                         coletados.append(item)
 
+                    pagina += 1
                     await asyncio.sleep(1.5)
                 except Exception as exc:
                     self.diagnostico.append(f"Página {pagina}: erro {type(exc).__name__}: {exc}")
