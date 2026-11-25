@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 from urllib.parse import quote_plus
 import httpx
@@ -134,10 +135,20 @@ class OLXScraper(BaseScraper):
         coletados: list[dict] = []
         urls_vistas: set[str] = set()
 
+        # Proxy residencial opcional (ex.: http://usuario:senha@host:porta), definido no Render
+        proxy_url = os.getenv("OLX_PROXY_URL") or None
+        verificar_ssl = os.getenv("OLX_PROXY_VERIFY_SSL", "true").lower() != "false"
+        if not proxy_url:
+            self.diagnostico.append(
+                "Sem proxy configurado (OLX_PROXY_URL): o OLX costuma bloquear servidores em nuvem."
+            )
+
         async with httpx.AsyncClient(
             headers=self.HEADERS,
-            timeout=20.0,
+            timeout=60.0 if proxy_url else 20.0,
             follow_redirects=True,
+            proxy=proxy_url,
+            verify=verificar_ssl,
         ) as client:
             for pagina in range(1, params.limite_paginas + 1):
                 url = self._montar_url(params, pagina)
