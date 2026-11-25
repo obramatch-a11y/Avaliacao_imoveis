@@ -38,6 +38,22 @@ class OLXScraper(BaseScraper):
     def __init__(self):
         self.diagnostico: list[str] = []
 
+    ALUGUEL_RE = re.compile(
+        r"\b(aluga-?se|alugo|aluguel|alugar|para alugar|loca[cç][aã]o|locar)\b", re.IGNORECASE
+    )
+    VENDA_RE = re.compile(
+        r"\b(vende-?se|vendo|venda|[àa] venda|para vender|financi\w+)\b", re.IGNORECASE
+    )
+
+    def _bate_finalidade(self, item: dict, finalidade: str) -> bool:
+        """Descarta anúncios cujo texto indica a finalidade oposta à escolhida."""
+        texto = f"{item.get('titulo', '')} {item.get('descricao', '')}"
+        tem_aluguel = bool(self.ALUGUEL_RE.search(texto))
+        tem_venda = bool(self.VENDA_RE.search(texto))
+        if finalidade == "VENDA":
+            return not (tem_aluguel and not tem_venda)
+        return not (tem_venda and not tem_aluguel)
+
     def _montar_url(self, params: BuscaImovelInput, pagina: int) -> str:
         uf = params.uf.lower().strip()
         tipo = self.TIPO_SLUGS.get(params.tipo_imovel, "apartamentos")
@@ -172,6 +188,13 @@ class OLXScraper(BaseScraper):
                             f"Página {pagina}: HTTP 200, mas nenhum anúncio encontrado no HTML ({len(resp.text)} bytes)"
                         )
                         break
+
+                    antes = len(itens)
+                    itens = [i for i in itens if self._bate_finalidade(i, params.finalidade)]
+                    if antes != len(itens):
+                        self.diagnostico.append(
+                            f"Página {pagina}: {antes - len(itens)} anúncio(s) descartado(s) por não serem de {params.finalidade}"
+                        )
 
                     for item in itens:
                         link = item.get("url", "")
