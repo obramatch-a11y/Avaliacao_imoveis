@@ -1,6 +1,6 @@
 import csv
 import io
-from app.models import AmostraSISDEA
+from app.models import AmostraMercado
 
 COLUNAS_COMPLETAS = [
     "id_amostra",
@@ -29,7 +29,7 @@ COLUNAS_COMPLETAS = [
     "url_anuncio",
 ]
 
-COLUNAS_SISDEA_NUMERICAS = [
+COLUNAS_NUMERICAS = [
     "id_amostra",
     "valor_oferta",
     "area_m2",
@@ -48,11 +48,11 @@ COLUNAS_SISDEA_NUMERICAS = [
 ]
 
 
-def gerar_csv_sisdea(
-    amostras: list[AmostraSISDEA],
+def gerar_csv(
+    amostras: list[AmostraMercado],
     apenas_numericas: bool = False,
 ) -> str:
-    colunas = COLUNAS_SISDEA_NUMERICAS if apenas_numericas else COLUNAS_COMPLETAS
+    colunas = COLUNAS_NUMERICAS if apenas_numericas else COLUNAS_COMPLETAS
     buffer = io.StringIO()
     writer = csv.DictWriter(
         buffer,

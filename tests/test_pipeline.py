@@ -1,8 +1,8 @@
-from app.exporter import gerar_csv_sisdea
+from app.exporter import gerar_csv
 from app.normalizer import normalizar_registro_bruto
 
 
-def test_normalizacao_e_csv_sisdea():
+def test_normalizacao_e_csv():
     raw = {
         "fonte": "OLX",
         "titulo": "Apto 3 quartos com elevador e piscina no 8º andar",
@@ -29,6 +29,6 @@ def test_normalizacao_e_csv_sisdea():
     assert amostra.andar == 8
     assert amostra.alerta_saneamento == "OK"
 
-    csv_num = gerar_csv_sisdea([amostra], apenas_numericas=True)
+    csv_num = gerar_csv([amostra], apenas_numericas=True)
     assert "valor_oferta;area_m2;valor_m2" in csv_num
     assert "650000.0;92.5;" in csv_num

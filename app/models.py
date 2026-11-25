@@ -14,7 +14,7 @@ class BuscaImovelInput(BaseModel):
     limite_paginas: int = Field(default=2, ge=1, le=5)
 
 
-class AmostraSISDEA(BaseModel):
+class AmostraMercado(BaseModel):
     id_amostra: int
     fonte: str
     data_coleta: str

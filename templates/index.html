@@ -1,179 +1,440 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coletor SISDEA Web — Pesquisa de Mercado Imobiliário</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="light dark" />
+  <title>Inferência Estatística — Inteligência Estatística Aplicada à Avaliação de Imóveis</title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("ie-tema");
+        if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    /* ===== Design tokens ===== */
+    :root {
+      --bg: #f6f7fb; --surface: #ffffff; --surface-2: #f0f2f8; --border: #e2e5ef;
+      --text: #151a2d; --muted: #5d6580; --brand: #4338ca; --brand-2: #6366f1; --brand-ink: #ffffff;
+      --ok: #047857; --ok-bg: #d9f5e8; --warn: #92400e; --warn-bg: #fdecc8; --danger: #b91c1c;
+      --shadow: 0 1px 2px rgba(21,26,45,.06), 0 4px 16px rgba(21,26,45,.05);
+      --radius: 12px; --radius-sm: 8px;
+      --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    [data-theme="dark"] {
+      --bg: #0d1020; --surface: #151a30; --surface-2: #1c2240; --border: #2a3156;
+      --text: #e8ebf7; --muted: #99a2c4; --brand: #818cf8; --brand-2: #a5b4fc; --brand-ink: #0d1020;
+      --ok: #6ee7b7; --ok-bg: #0f3a2c; --warn: #fcd34d; --warn-bg: #3d2e0b; --danger: #fca5a5;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); min-height: 100vh; }
+    a { color: var(--brand); }
+    :focus-visible { outline: 2px solid var(--brand-2); outline-offset: 2px; border-radius: 4px; }
+
+    /* ===== Layout ===== */
+    .topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--surface) 88%, transparent);
+      backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+    .topbar-in { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
+    .logo { width: 34px; height: 34px; border-radius: 9px; flex: none;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2)); display: grid; place-items: center; }
+    .brand h1 { margin: 0; font-size: 16px; letter-spacing: -.01em; line-height: 1.2; }
+    .brand p { margin: 0; font-size: 11.5px; color: var(--muted); }
+    .spacer { flex: 1; }
+    .chip { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); background: var(--surface-2); white-space: nowrap; }
+    .icon-btn { width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      display: grid; place-items: center; cursor: pointer; transition: background .15s, transform .15s; }
+    .icon-btn:hover { background: var(--surface-2); }
+    .icon-btn:active { transform: scale(.96); }
+    main { max-width: 1280px; margin: 0 auto; padding: 20px; display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+    main > * { min-width: 0; }
+    .f, .f > * { min-width: 0; }
+
+    /* ===== Passos ===== */
+    .steps { display: flex; gap: 6px; flex-wrap: wrap; list-style: none; padding: 0; margin: 0; }
+    .steps li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); padding: 6px 12px 6px 8px;
+      border-radius: 999px; border: 1px solid var(--border); background: var(--surface); }
+    .steps b { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px;
+      background: var(--surface-2); color: var(--muted); }
+    .steps li.on { color: var(--text); border-color: var(--brand); }
+    .steps li.on b { background: var(--brand); color: var(--brand-ink); }
+    .steps li.done b { background: var(--ok-bg); color: var(--ok); }
+
+    /* ===== Cartões ===== */
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .panel-h { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .panel-h h2 { margin: 0; font-size: 14.5px; letter-spacing: -.005em; }
+    .panel-h small { color: var(--muted); }
+    .panel-b { padding: 18px; }
+
+    /* ===== Formulário ===== */
+    form.grid { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .f label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+    .f input, .f select, .tools input, .tools select {
+      width: 100%; height: 38px; padding: 0 11px; font: inherit; color: var(--text); background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); transition: border-color .15s, box-shadow .15s; }
+    .f input:focus, .f select:focus, .tools input:focus, .tools select:focus { outline: none; border-color: var(--brand-2);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-2) 25%, transparent); }
+    .f .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .actions { grid-column: 1 / -1; display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+    .hint { color: var(--muted); font-size: 12px; margin-right: auto; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; font: inherit; font-weight: 600;
+      border-radius: var(--radius-sm); border: 1px solid transparent; cursor: pointer; transition: filter .15s, transform .1s, background .15s; text-decoration: none; }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--brand); color: var(--brand-ink); }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .btn-ghost:hover { background: var(--surface-2); }
+    .btn[disabled] { opacity: .7; cursor: progress; }
+    .spin { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: giro .7s linear infinite; display: none; }
+    .loading .spin { display: inline-block; }
+    @keyframes giro { to { transform: rotate(360deg); } }
+
+    /* ===== Indicadores ===== */
+    .kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+    .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); }
+    .kpi span { display: block; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+    .kpi strong { display: block; font-size: 21px; letter-spacing: -.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .kpi em { font-style: normal; font-size: 11.5px; color: var(--muted); }
+    .grau { border-left: 4px solid var(--brand); }
+
+    /* ===== Tabela ===== */
+    .tools { display: flex; gap: 10px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--border); align-items: center; }
+    .tools .search { position: relative; flex: 1 1 220px; max-width: 340px; }
+    .tools .search svg { position: absolute; left: 10px; top: 10px; color: var(--muted); }
+    .tools .search input { padding-left: 33px; }
+    .tools select { width: auto; }
+    .tw { overflow: auto; max-height: 68vh; }
+    table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+    thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-2); color: var(--muted); text-align: left; font-size: 11.5px;
+      text-transform: uppercase; letter-spacing: .04em; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; user-select: none; }
+    thead th.s { cursor: pointer; }
+    thead th.s:hover { color: var(--text); }
+    thead th.s::after { content: " ↕"; opacity: .35; }
+    thead th.asc::after { content: " ↑"; opacity: 1; color: var(--brand); }
+    thead th.desc::after { content: " ↓"; opacity: 1; color: var(--brand); }
+    tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tbody tr:hover { background: var(--surface-2); }
+    tbody tr.alerta td { background: color-mix(in srgb, var(--warn-bg) 55%, transparent); }
+    td.n, th.n { text-align: right; }
+    .tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+    .tag.ok { background: var(--ok-bg); color: var(--ok); }
+    .tag.warn { background: var(--warn-bg); color: var(--warn); }
+    input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
+    .muted { color: var(--muted); }
+    .vazio { padding: 28px 18px; text-align: center; color: var(--muted); display: none; }
+
+    /* ===== Avisos ===== */
+    .aviso { border: 1px solid var(--border); border-left: 4px solid var(--warn); background: var(--surface); border-radius: var(--radius); padding: 14px 18px; box-shadow: var(--shadow); }
+    .aviso h3 { margin: 0 0 4px; font-size: 14px; }
+    .aviso p { margin: 0; color: var(--muted); }
+    .aviso ul { margin: 8px 0 0; padding-left: 18px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+    /* ===== Tooltip ===== */
+    [data-tip] { position: relative; cursor: help; border-bottom: 1px dotted var(--muted); }
+    [data-tip]:hover::after, [data-tip]:focus::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: 260px;
+      background: var(--text); color: var(--bg); padding: 8px 10px; border-radius: 8px; font: 12px/1.4 var(--font); text-transform: none; letter-spacing: 0; font-weight: 400; box-shadow: var(--shadow); white-space: normal; }
+
+    footer { max-width: 1280px; margin: 0 auto; padding: 4px 20px 28px; color: var(--muted); font-size: 12px; }
+
+    /* ===== Responsivo ===== */
+    @media (max-width: 1000px) { form.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 600px) {
+      main { padding: 12px; gap: 12px; } .topbar-in { padding: 8px 12px; } .chip { display: none; }
+      form.grid { grid-template-columns: minmax(0, 1fr); } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .kpi.grau { grid-column: 1 / -1; } .kpi strong { font-size: 18px; } .panel-b { padding: 14px; } .steps li span { display: none; } .steps li.on span { display: inline; }
+      .actions .btn { flex: 1; justify-content: center; } .tools .search { max-width: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-  <header class="bg-slate-900 text-white py-4 px-6 shadow">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-      <div>
-        <h1 class="text-xl font-bold tracking-tight">Coletor SISDEA Web</h1>
-        <p class="text-xs text-slate-300">Amostragem de mercado padronizada (ABNT NBR 14653-2)</p>
+<body>
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M5 16l4-5 4 3 6-8"/><circle cx="9" cy="11" r="1.2" fill="#fff"/><circle cx="13" cy="14" r="1.2" fill="#fff"/></svg>
       </div>
-      <span class="text-xs bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-full">
-        MVP v0.1 • Exportação CSV
-      </span>
+      <div class="brand">
+        <h1>Inferência Estatística</h1>
+        <p>Inteligência Estatística Aplicada à Avaliação de Imóveis</p>
+      </div>
+      <div class="spacer"></div>
+      <span class="chip">Amostragem · ABNT NBR 14653-2</span>
+      <button class="icon-btn" id="tema" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+        <svg id="ic-sol" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg id="ic-lua" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+      </button>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-      <h2 class="text-base font-semibold text-slate-800 mb-4">1. Parâmetros do Imóvel Avaliando</h2>
-      <form action="/buscar" method="post" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">UF *</label>
-          <input type="text" name="uf" maxlength="2" required placeholder="AL"
-                 value="{{ filtros.get('uf', 'AL') }}"
-                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm uppercase" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Cidade *</label>
-          <input type="text" name="cidade" required placeholder="Maceió"
-                 value="{{ filtros.get('cidade', '') }}"
-                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Bairro (opcional)</label>
-          <input type="text" name="bairro" placeholder="Pajuçara"
-                 value="{{ filtros.get('bairro', '') }}"
-                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Tipo de Imóvel</label>
-          <select name="tipo_imovel" class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm">
-            {% for tipo in ["APARTAMENTO", "CASA", "TERRENO", "COMERCIAL"] %}
-              <option value="{{ tipo }}" {% if filtros.get('tipo_imovel') == tipo %}selected{% endif %}>{{ tipo }}</option>
-            {% endfor %}
-          </select>
-        </div>
+  <main>
+    {% set tem = amostras is not none and amostras|length > 0 %}
+    <ol class="steps" aria-label="Etapas">
+      <li class="{{ 'done' if filtros else 'on' }}"><b>1</b><span>Parâmetros</span></li>
+      <li class="{{ 'done' if tem else ('on' if filtros else '') }}"><b>2</b><span>Coleta</span></li>
+      <li class="{{ 'on' if tem else '' }}"><b>3</b><span>Curadoria</span></li>
+      <li><b>4</b><span>Exportação</span></li>
+    </ol>
 
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Finalidade</label>
-          <select name="finalidade" class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm">
-            <option value="VENDA" {% if filtros.get('finalidade') == 'VENDA' %}selected{% endif %}>VENDA (Oferta)</option>
-            <option value="LOCACAO" {% if filtros.get('finalidade') == 'LOCACAO' %}selected{% endif %}>LOCAÇÃO (Oferta)</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Área Mínima (m²)</label>
-          <input type="number" step="0.01" name="area_min" placeholder="Ex: 50"
-                 value="{{ filtros.get('area_min') or '' }}"
-                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Área Máxima (m²)</label>
-          <input type="number" step="0.01" name="area_max" placeholder="Ex: 120"
-                 value="{{ filtros.get('area_max') or '' }}"
-                 class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Quartos (mín.) / Páginas</label>
-          <div class="flex gap-2">
-            <input type="number" name="quartos_min" placeholder="Quartos"
-                   value="{{ filtros.get('quartos_min') or '' }}"
-                   class="w-1/2 rounded-lg border-slate-300 border px-3 py-2 text-sm" />
-            <select name="limite_paginas" class="w-1/2 rounded-lg border-slate-300 border px-2 py-2 text-sm">
-              <option value="1">1 pág.</option>
-              <option value="2" selected>2 págs.</option>
-              <option value="3">3 págs.</option>
-            </select>
+    <section class="panel" aria-labelledby="t-param">
+      <div class="panel-h"><h2 id="t-param">Parâmetros do imóvel avaliando</h2><small>Campos com * são obrigatórios</small></div>
+      <div class="panel-b">
+        <form action="/buscar" method="post" class="grid" id="formBusca">
+          <div class="f"><label for="uf">UF *</label>
+            <input id="uf" type="text" name="uf" maxlength="2" required placeholder="PE" autocomplete="off" style="text-transform:uppercase"
+                   value="{{ filtros.get('uf', '') }}" /></div>
+          <div class="f"><label for="cidade">Cidade *</label>
+            <input id="cidade" type="text" name="cidade" required placeholder="Jaboatão dos Guararapes" value="{{ filtros.get('cidade', '') }}" /></div>
+          <div class="f"><label for="bairro">Bairro</label>
+            <input id="bairro" type="text" name="bairro" placeholder="Opcional" value="{{ filtros.get('bairro', '') }}" /></div>
+          <div class="f"><label for="tipo">Tipo de imóvel</label>
+            <select id="tipo" name="tipo_imovel">
+              {% for tipo in ["APARTAMENTO", "CASA", "TERRENO", "COMERCIAL"] %}
+                <option value="{{ tipo }}" {% if filtros.get('tipo_imovel') == tipo %}selected{% endif %}>{{ tipo|capitalize }}</option>
+              {% endfor %}
+            </select></div>
+          <div class="f"><label for="fin">Finalidade</label>
+            <select id="fin" name="finalidade">
+              <option value="VENDA" {% if filtros.get('finalidade') == 'VENDA' %}selected{% endif %}>Venda (oferta)</option>
+              <option value="LOCACAO" {% if filtros.get('finalidade') == 'LOCACAO' %}selected{% endif %}>Locação (oferta)</option>
+            </select></div>
+          <div class="f"><label for="amin">Área mínima (m²)</label>
+            <input id="amin" type="number" step="0.01" name="area_min" placeholder="50" value="{{ filtros.get('area_min') or '' }}" inputmode="decimal" /></div>
+          <div class="f"><label for="amax">Área máxima (m²)</label>
+            <input id="amax" type="number" step="0.01" name="area_max" placeholder="120" value="{{ filtros.get('area_max') or '' }}" inputmode="decimal" /></div>
+          <div class="f"><label for="qts">Quartos (mín.) · Páginas</label>
+            <div class="pair">
+              <input id="qts" type="number" name="quartos_min" placeholder="Quartos" value="{{ filtros.get('quartos_min') or '' }}" inputmode="numeric" />
+              <select name="limite_paginas" aria-label="Páginas">
+                {% for n in [1, 2, 3] %}<option value="{{ n }}" {% if (filtros.get('limite_paginas') or 2) == n %}selected{% endif %}>{{ n }} pág.</option>{% endfor %}
+              </select>
+            </div></div>
+          <div class="actions">
+            <span class="hint">Os dados do formulário ficam salvos neste aparelho.</span>
+            <button type="submit" class="btn btn-primary" id="btnBuscar">
+              <span class="spin" aria-hidden="true"></span><span id="btnTxt">Coletar amostras</span>
+            </button>
           </div>
-        </div>
-
-        <div class="sm:col-span-2 lg:col-span-4 flex justify-end pt-2">
-          <button type="submit"
-                  class="bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm px-5 py-2.5 rounded-lg shadow-sm transition">
-            Coletar Amostras Agora
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </section>
 
-    {% if amostras is not none and amostras|length > 0 %}
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h2 class="text-base font-semibold text-slate-800">
-            2. Curadoria da Amostra ({{ amostras|length }} imóveis coletados)
-          </h2>
-          {% if status_nbr %}
-            <p class="text-xs text-slate-600 mt-0.5">{{ status_nbr }}</p>
-          {% endif %}
-        </div>
+    {% if tem %}
+    <section class="kpis" aria-label="Indicadores da amostra" id="kpis">
+      <div class="kpi"><span>Amostras selecionadas</span><strong id="k-n">–</strong><em id="k-de">de {{ amostras|length }} coletadas</em></div>
+      <div class="kpi"><span data-tip="Valor médio por metro quadrado das amostras marcadas em &quot;Usar&quot;." tabindex="0">Média R$/m²</span><strong id="k-media">–</strong><em>amostras marcadas</em></div>
+      <div class="kpi"><span data-tip="Valor central: metade das amostras está abaixo e metade acima. Pouco afetada por extremos." tabindex="0">Mediana R$/m²</span><strong id="k-mediana">–</strong><em>amostras marcadas</em></div>
+      <div class="kpi"><span data-tip="Dispersão relativa: desvio-padrão dividido pela média. Quanto menor, mais homogênea a amostra." tabindex="0">Coef. de variação</span><strong id="k-cv">–</strong><em>R$/m²</em></div>
+      <div class="kpi grau"><span data-tip="Mínimo de dados exigido pela NBR 14653-2. Confira também a relação com o número de variáveis do modelo." tabindex="0">Mínimo amostral</span><strong id="k-grau" style="font-size:15px;line-height:1.3">–</strong><em>conforme NBR 14653-2</em></div>
+    </section>
 
-        <form id="formExport" action="/exportar-csv" method="post" class="flex flex-wrap gap-2">
-          <button type="submit" name="modo" value="completo"
-                  class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2 rounded-lg">
-            Baixar CSV Completo (com URLs)
+    <section class="panel" aria-labelledby="t-cur">
+      <div class="panel-h">
+        <h2 id="t-cur">Curadoria da amostra</h2>
+        <small>{{ amostras|length }} imóveis coletados · desmarque os que não servem</small>
+        <div class="spacer"></div>
+        <form id="formExport" action="/exportar-csv" method="post" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="submit" name="modo" value="completo" class="btn btn-ghost">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>CSV completo
           </button>
-          <button type="submit" name="modo" value="numerico"
-                  class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-4 py-2 rounded-lg">
-            Baixar CSV Numérico (SISDEA)
+          <button type="submit" name="modo" value="numerico" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>CSV numérico
           </button>
         </form>
       </div>
 
-      <div class="overflow-x-auto border border-slate-200 rounded-lg">
-        <table class="min-w-full text-xs text-left">
-          <thead class="bg-slate-100 text-slate-700 uppercase">
+      <div class="tools">
+        <div class="search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="busca" type="search" placeholder="Buscar na tabela…" aria-label="Buscar na tabela" />
+        </div>
+        <select id="fStatus" aria-label="Filtrar por status">
+          <option value="">Todos os status</option><option value="ok">Somente OK</option><option value="alerta">Somente alertas</option>
+        </select>
+        <button class="btn btn-ghost" type="button" id="soOk">Marcar só OK</button>
+        <button class="btn btn-ghost" type="button" id="todos">Marcar todos</button>
+        <button class="btn btn-ghost" type="button" id="nenhum">Limpar</button>
+      </div>
+
+      <div class="tw">
+        <table id="tab">
+          <thead>
             <tr>
-              <th class="p-2.5">Usar</th>
-              <th class="p-2.5">Status</th>
-              <th class="p-2.5">Bairro</th>
-              <th class="p-2.5">Valor (R$)</th>
-              <th class="p-2.5">Área (m²)</th>
-              <th class="p-2.5">R$/m²</th>
-              <th class="p-2.5">Qts</th>
-              <th class="p-2.5">Vagas</th>
-              <th class="p-2.5">Andar</th>
-              <th class="p-2.5">Elev.</th>
-              <th class="p-2.5">Pisc.</th>
-              <th class="p-2.5">Link</th>
+              <th>Usar</th>
+              <th class="s" data-t="txt">Status</th>
+              <th class="s" data-t="txt">Bairro</th>
+              <th class="s n" data-t="num">Valor (R$)</th>
+              <th class="s n" data-t="num">Área (m²)</th>
+              <th class="s n" data-t="num">R$/m²</th>
+              <th class="s n" data-t="num">Qts</th>
+              <th class="s n" data-t="num">Vagas</th>
+              <th class="s n" data-t="num">Andar</th>
+              <th class="n">Elev.</th>
+              <th class="n">Pisc.</th>
+              <th>Link</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-200">
+          <tbody>
             {% for a in amostras %}
-            <tr class="hover:bg-slate-50 {% if a.alerta_saneamento != 'OK' %}bg-amber-50/60{% endif %}">
-              <td class="p-2.5">
-                <input type="checkbox" form="formExport" name="ids_selecionados" value="{{ a.id_amostra }}"
-                       {% if a.alerta_saneamento == 'OK' %}checked{% endif %} />
+            <tr class="{% if a.alerta_saneamento != 'OK' %}alerta{% endif %}" data-st="{{ 'ok' if a.alerta_saneamento == 'OK' else 'alerta' }}"
+                data-m2="{{ a.valor_m2 if a.valor_m2 is not none else '' }}">
+              <td><input type="checkbox" form="formExport" name="ids_selecionados" value="{{ a.id_amostra }}" aria-label="Usar amostra {{ a.id_amostra }}"
+                         {% if a.alerta_saneamento == 'OK' %}checked{% endif %}></td>
+              <td data-v="{{ a.alerta_saneamento }}">
+                {% if a.alerta_saneamento == 'OK' %}<span class="tag ok">OK</span>
+                {% else %}<span class="tag warn" data-tip="{{ 'Valor ou área fora da faixa esperada. Confira o anúncio antes de usar.' if a.alerta_saneamento == 'POSSIVEL_OUTLIER' else 'Dado inconsistente.' }}" tabindex="0">{{ a.alerta_saneamento|replace('_', ' ')|capitalize }}</span>{% endif %}
               </td>
-              <td class="p-2.5 font-medium">
-                {% if a.alerta_saneamento == 'OK' %}
-                  <span class="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">OK</span>
-                {% else %}
-                  <span class="text-amber-800 bg-amber-200 px-2 py-0.5 rounded">{{ a.alerta_saneamento }}</span>
-                {% endif %}
-              </td>
-              <td class="p-2.5">{{ a.bairro }}</td>
-              <td class="p-2.5 font-semibold">{{ a.valor_oferta or '-' }}</td>
-              <td class="p-2.5">{{ a.area_m2 or '-' }}</td>
-              <td class="p-2.5">{{ a.valor_m2 or '-' }}</td>
-              <td class="p-2.5">{{ a.quartos or '-' }}</td>
-              <td class="p-2.5">{{ a.vagas }}</td>
-              <td class="p-2.5">{{ a.andar if a.andar is not none else '-' }}</td>
-              <td class="p-2.5">{{ a.elevador }}</td>
-              <td class="p-2.5">{{ a.piscina }}</td>
-              <td class="p-2.5">
-                {% if a.url_anuncio %}
-                  <a href="{{ a.url_anuncio }}" target="_blank" class="text-blue-600 underline">Abrir</a>
-                {% endif %}
-              </td>
+              <td data-v="{{ a.bairro }}">{% if a.bairro == 'NAO_INFORMADO' %}<span class="muted">Não informado</span>{% else %}{{ a.bairro }}{% endif %}</td>
+              <td class="n" data-v="{{ a.valor_oferta if a.valor_oferta is not none else '' }}" data-f="brl"><strong>{{ a.valor_oferta or '–' }}</strong></td>
+              <td class="n" data-v="{{ a.area_m2 if a.area_m2 is not none else '' }}" data-f="dec">{{ a.area_m2 or '–' }}</td>
+              <td class="n" data-v="{{ a.valor_m2 if a.valor_m2 is not none else '' }}" data-f="brl">{{ a.valor_m2 or '–' }}</td>
+              <td class="n" data-v="{{ a.quartos if a.quartos is not none else '' }}">{{ a.quartos if a.quartos is not none else '–' }}</td>
+              <td class="n" data-v="{{ a.vagas }}">{{ a.vagas }}</td>
+              <td class="n" data-v="{{ a.andar if a.andar is not none else '' }}">{{ a.andar if a.andar is not none else '–' }}</td>
+              <td class="n">{{ 'Sim' if a.elevador else '–' }}</td>
+              <td class="n">{{ 'Sim' if a.piscina else '–' }}</td>
+              <td>{% if a.url_anuncio %}<a href="{{ a.url_anuncio }}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>{% endif %}</td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
+        <div class="vazio" id="vazio">Nenhuma amostra corresponde à busca ou ao filtro.</div>
       </div>
     </section>
+
     {% elif filtros %}
-    <section class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm">
-      Nenhuma amostra retornada para esses filtros (ou o portal bloqueou temporariamente a requisição do servidor). Tente ampliar o filtro ou rodar localmente.
-      {% if diagnostico %}<ul class="mt-2 font-mono text-xs">{% for d in diagnostico %}<li>{{ d }}</li>{% endfor %}</ul>{% endif %}
+    <section class="aviso" role="status">
+      <h3>Nenhuma amostra encontrada</h3>
+      <p>O portal não retornou anúncios para esses filtros. Tente ampliar a área, reduzir os quartos ou deixar o bairro em branco.</p>
+      {% if diagnostico %}<ul>{% for d in diagnostico %}<li>{{ d }}</li>{% endfor %}</ul>{% endif %}
+    </section>
+    {% endif %}
+
+    {% if tem and diagnostico %}
+    <section class="aviso" role="status">
+      <h3>Observações da coleta</h3>
+      <ul>{% for d in diagnostico %}<li>{{ d }}</li>{% endfor %}</ul>
     </section>
     {% endif %}
   </main>
+
+  <footer>Inferência Estatística · Os dados são ofertas de mercado e devem ser validados pelo avaliador antes do uso em laudo.</footer>
+
+  <script>
+  (function () {
+    var $ = function (s, c) { return (c || document).querySelector(s); };
+    var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
+
+    /* Tema */
+    function icones() {
+      var escuro = document.documentElement.getAttribute("data-theme") === "dark";
+      $("#ic-sol").style.display = escuro ? "none" : "";
+      $("#ic-lua").style.display = escuro ? "" : "none";
+    }
+    icones();
+    $("#tema").addEventListener("click", function () {
+      var novo = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", novo);
+      try { localStorage.setItem("ie-tema", novo); } catch (e) {}
+      icones();
+    });
+
+    /* Formulário: salvar/restaurar neste aparelho + estado de carregamento */
+    var form = $("#formBusca"), CHAVE = "ie-form";
+    var campos = ["uf", "cidade", "bairro", "tipo_imovel", "finalidade", "area_min", "area_max", "quartos_min", "limite_paginas"];
+    try {
+      var salvo = JSON.parse(localStorage.getItem(CHAVE) || "null");
+      if (salvo && !form.elements.cidade.value) {
+        campos.forEach(function (c) { if (salvo[c] != null && form.elements[c]) form.elements[c].value = salvo[c]; });
+      }
+    } catch (e) {}
+    form.addEventListener("submit", function () {
+      try {
+        var o = {}; campos.forEach(function (c) { o[c] = form.elements[c].value; });
+        localStorage.setItem(CHAVE, JSON.stringify(o));
+      } catch (e) {}
+      var b = $("#btnBuscar"); b.classList.add("loading"); b.disabled = true;
+      $("#btnTxt").textContent = "Coletando… pode levar até 1 minuto";
+    });
+
+    var tab = $("#tab");
+    if (!tab) return;
+
+    /* Formatação pt-BR (apenas exibição; os valores originais ficam em data-v) */
+    var brl = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+    var dec = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+    $$("td[data-f]", tab).forEach(function (td) {
+      var v = parseFloat(td.getAttribute("data-v"));
+      if (isNaN(v)) return;
+      var fmt = td.getAttribute("data-f") === "brl" ? brl : dec;
+      var alvo = td.querySelector("strong") || td; alvo.textContent = fmt.format(v);
+    });
+
+    var tbody = $("tbody", tab), linhas = $$("tr", tbody);
+
+    /* Indicadores: calculados sobre as linhas marcadas em "Usar" */
+    function indicadores() {
+      var v = linhas.filter(function (r) { return $("input[type=checkbox]", r).checked; })
+                    .map(function (r) { return parseFloat(r.getAttribute("data-m2")); })
+                    .filter(function (x) { return !isNaN(x); });
+      var n = linhas.filter(function (r) { return $("input[type=checkbox]", r).checked; }).length;
+      $("#k-n").textContent = n;
+      if (!v.length) { ["k-media", "k-mediana", "k-cv"].forEach(function (i) { $("#" + i).textContent = "–"; }); }
+      else {
+        var soma = v.reduce(function (a, b) { return a + b; }, 0), media = soma / v.length;
+        var s = v.slice().sort(function (a, b) { return a - b; });
+        var med = s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+        var dp = v.length > 1 ? Math.sqrt(v.reduce(function (a, b) { return a + Math.pow(b - media, 2); }, 0) / (v.length - 1)) : 0;
+        $("#k-media").textContent = "R$ " + brl.format(media);
+        $("#k-mediana").textContent = "R$ " + brl.format(med);
+        $("#k-cv").textContent = v.length > 1 ? dec.format(dp / media * 100) + "%" : "–";
+      }
+      $("#k-grau").textContent = n >= 15 ? "Grau III (≥ 15 dados)" : n >= 10 ? "Grau II (≥ 10 dados)" : n >= 5 ? "Grau I (≥ 5 dados)" : "Abaixo de 5 dados";
+    }
+    tbody.addEventListener("change", indicadores);
+    indicadores();
+
+    /* Busca e filtro */
+    function filtrar() {
+      var q = $("#busca").value.trim().toLowerCase(), st = $("#fStatus").value, vis = 0;
+      linhas.forEach(function (r) {
+        var ok = (!st || r.getAttribute("data-st") === st) && (!q || r.textContent.toLowerCase().indexOf(q) > -1);
+        r.style.display = ok ? "" : "none"; if (ok) vis++;
+      });
+      $("#vazio").style.display = vis ? "none" : "block";
+    }
+    $("#busca").addEventListener("input", filtrar);
+    $("#fStatus").addEventListener("change", filtrar);
+
+    /* Seleção em massa */
+    function marcar(fn) { linhas.forEach(function (r) { $("input[type=checkbox]", r).checked = fn(r); }); indicadores(); }
+    $("#soOk").addEventListener("click", function () { marcar(function (r) { return r.getAttribute("data-st") === "ok"; }); });
+    $("#todos").addEventListener("click", function () { marcar(function () { return true; }); });
+    $("#nenhum").addEventListener("click", function () { marcar(function () { return false; }); });
+
+    /* Ordenação por coluna */
+    $$("th.s", tab).forEach(function (th) {
+      th.addEventListener("click", function () {
+        var idx = $$("th", tab).indexOf(th), asc = !th.classList.contains("asc"), num = th.getAttribute("data-t") === "num";
+        $$("th", tab).forEach(function (h) { h.classList.remove("asc", "desc"); });
+        th.classList.add(asc ? "asc" : "desc");
+        linhas.sort(function (a, b) {
+          var x = a.children[idx].getAttribute("data-v") || "", y = b.children[idx].getAttribute("data-v") || "";
+          if (num) {
+            x = parseFloat(x); y = parseFloat(y);
+            if (isNaN(x)) return 1; if (isNaN(y)) return -1;   /* vazios sempre ao final */
+            return asc ? x - y : y - x;
+          }
+          return asc ? x.localeCompare(y, "pt-BR") : y.localeCompare(x, "pt-BR");
+        }).forEach(function (r) { tbody.appendChild(r); });
+      });
+    });
+  })();
+  </script>
 </body>
 </html>

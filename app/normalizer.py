@@ -2,7 +2,7 @@ import re
 import unicodedata
 from datetime import date
 from typing import Optional
-from app.models import AmostraSISDEA
+from app.models import AmostraMercado
 
 
 def remover_acentos(texto: str) -> str:
@@ -101,7 +101,7 @@ def normalizar_registro_bruto(
     cidade: str,
     tipo_imovel: str,
     finalidade: str,
-) -> AmostraSISDEA:
+) -> AmostraMercado:
     titulo = str(raw.get("titulo", "")).strip()
     descricao = str(raw.get("descricao", "")).strip()
     detalhes = str(raw.get("detalhes", "")).strip()
@@ -132,7 +132,7 @@ def normalizar_registro_bruto(
     bairro_limpo = str(raw.get("bairro", "")).strip() or "NAO_INFORMADO"
     alerta = diagnosticar_saneamento(valor, area, finalidade)
 
-    return AmostraSISDEA(
+    return AmostraMercado(
         id_amostra=idx,
         fonte=str(raw.get("fonte", "OLX")),
         data_coleta=date.today().isoformat(),

@@ -3,15 +3,15 @@ from typing import Optional
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from app.exporter import gerar_csv_sisdea
-from app.models import AmostraSISDEA, BuscaImovelInput
+from app.exporter import gerar_csv
+from app.models import AmostraMercado, BuscaImovelInput
 from app.normalizer import normalizar_registro_bruto
 from app.scrapers.olx import OLXScraper
 
-app = FastAPI(title="Coletor SISDEA Web", version="0.1.0")
+app = FastAPI(title="Inferência Estatística", version="0.2.0")
 templates = Jinja2Templates(directory="templates")
 
-ULTIMA_COLETA: list[AmostraSISDEA] = []
+ULTIMA_COLETA: list[AmostraMercado] = []
 
 
 def avaliar_grau_nbr14653(total_validas: int) -> str:
@@ -101,7 +101,7 @@ async def executar_busca(
     scraper = OLXScraper()
     brutos = await scraper.buscar(params)
 
-    normalizados: list[AmostraSISDEA] = []
+    normalizados: list[AmostraMercado] = []
     vistos_assinatura: set[tuple] = set()
 
     for item in brutos:
@@ -148,10 +148,10 @@ async def exportar_csv(
         a for a in ULTIMA_COLETA if not ids_selecionados or a.id_amostra in ids_selecionados
     ]
     apenas_numericas = modo == "numerico"
-    conteudo_csv = gerar_csv_sisdea(selecionadas, apenas_numericas=apenas_numericas)
+    conteudo_csv = gerar_csv(selecionadas, apenas_numericas=apenas_numericas)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-    nome_arquivo = f"amostra_sisdea_{modo}_{timestamp}.csv"
+    nome_arquivo = f"amostras_{modo}_{timestamp}.csv"
 
     return Response(
         content=conteudo_csv.encode("utf-8"),

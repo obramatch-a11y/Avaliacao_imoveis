@@ -1,6 +1,6 @@
-# Coletor SISDEA Web
+# Inferência Estatística
 
-Aplicativo web para coleta, padronização e saneamento de amostras de mercado imobiliário com exportação em **CSV** compatível com o **SISDEA** e aderente às boas práticas da **ABNT NBR 14653-2**.
+Aplicativo web para coleta, padronização e saneamento de amostras de mercado imobiliário com exportação em **CSV** e aderente às boas práticas da **ABNT NBR 14653-2**.
 
 ## Como rodar localmente
 ```bash
