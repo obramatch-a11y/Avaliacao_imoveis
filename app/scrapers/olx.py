@@ -83,6 +83,23 @@ class OLXScraper(BaseScraper):
             url += f"&ros={int(params.quartos_min)}"
         return url
 
+    def _texto_item(self, item: dict) -> str:
+        return f"{item.get('titulo', '')} {item.get('detalhes', '')} {item.get('descricao', '')}"
+
+    def _inferir_local(self, item: dict, params: BuscaImovelInput) -> None:
+        """Lê 'Cidade, Bairro' do texto do cartão quando o OLX não traz o bairro."""
+        if item.get("bairro"):
+            return
+        texto = self._texto_item(item)
+        m = re.search(
+            rf"{re.escape(params.cidade)}\s*,\s*([^,\d|•\n]+?)(?=\s+(?:Hoje|Ontem|\d{{1,2}}\s+de\s|\d{{1,2}}:\d{{2}}|R\$)|\s{{2,}}|$)",
+            texto,
+            re.IGNORECASE,
+        )
+        if m:
+            item["bairro"] = m.group(1).strip()
+            item.setdefault("cidade", params.cidade)
+
     def _local_confere(self, item: dict, params: BuscaImovelInput) -> bool:
         """Descarta anúncios de outra cidade/bairro quando o OLX informa o local."""
         cidade = self._slug(item.get("cidade", ""))
@@ -217,6 +234,8 @@ class OLXScraper(BaseScraper):
                             )
                         break
 
+                    for i in itens:
+                        self._inferir_local(i, params)
                     antes = len(itens)
                     itens = [
                         i for i in itens
@@ -241,5 +260,25 @@ class OLXScraper(BaseScraper):
                 except Exception as exc:
                     self.diagnostico.append(f"Página {pagina}: erro {type(exc).__name__}: {exc}")
                     break
+
+        if params.bairro and coletados:
+            alvo_b = self._slug(params.bairro)
+            do_bairro = [
+                i for i in coletados
+                if alvo_b in self._slug(i.get("bairro", "")) or alvo_b in self._slug(self._texto_item(i))
+            ]
+            if do_bairro:
+                for i in do_bairro:
+                    if not i.get("bairro"):
+                        i["bairro"] = params.bairro
+                if len(do_bairro) != len(coletados):
+                    self.diagnostico.append(
+                        f"{len(coletados) - len(do_bairro)} anúncio(s) descartado(s) por não serem do bairro {params.bairro}"
+                    )
+                coletados = do_bairro
+            else:
+                self.diagnostico.append(
+                    f"Não foi possível confirmar o bairro {params.bairro} nos anúncios; mantidos todos da cidade."
+                )
 
         return coletados
