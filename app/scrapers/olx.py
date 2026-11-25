@@ -152,35 +152,75 @@ class OLXScraper(BaseScraper):
             return []
         return resultados
 
+    @staticmethod
+    def _valores_rs(texto: str) -> list[tuple[int, str]]:
+        """Todos os 'R$ x' do texto, com a posição, ignorando IPTU e condomínio."""
+        achados = []
+        for m in re.finditer(r"R\$\s*([\d.]+(?:,\d+)?)", texto):
+            antes = texto[max(0, m.start() - 14):m.start()].lower()
+            if "iptu" in antes or "condom" in antes:
+                continue
+            achados.append((m.start(), m.group(1)))
+        return achados
+
+    @staticmethod
+    def _rotulado(texto: str, rotulo: str) -> str:
+        """Valor de 'IPTU R$ x' / 'Condomínio R$ x'; 'R$ 1' é marcador de não informado."""
+        m = re.search(rotulo + r"\s*R\$\s*([\d.]+(?:,\d+)?)", texto, re.IGNORECASE)
+        if not m:
+            return ""
+        bruto = m.group(1)
+        try:
+            num = float(bruto.replace(".", "").replace(",", "."))
+        except ValueError:
+            return ""
+        return bruto if num > 1 else ""
+
     def _extrair_de_html_cards(self, soup: BeautifulSoup) -> list[dict]:
         resultados = []
         cards = soup.select("section.olx-adcard, li[data-lurker-detail='list_id']")
         for card in cards:
             link_tag = card.find("a", href=True)
             titulo_tag = card.find(["h2", "h3"])
+            titulo = titulo_tag.get_text(" ", strip=True) if titulo_tag else ""
             texto_card = card.get_text(" ", strip=True)
+            # O título do anúncio traz números soltos (ex.: 'R$ 310 mil'); o preço real está fora dele
+            texto = texto_card.replace(titulo, " ", 1) if titulo else texto_card
 
-            preco_match = re.search(r"R\$\s*[\d.,]+", texto_card)
-            area_match = re.search(r"(\d+(?:[.,]\d+)?)\s*m²", texto_card)
-            quartos_match = re.search(r"(\d+)\s*quarto", texto_card, re.IGNORECASE)
-            vagas_match = re.search(r"(\d+)\s*vaga", texto_card, re.IGNORECASE)
-            banheiros_match = re.search(r"(\d+)\s*banheiro", texto_card, re.IGNORECASE)
+            valores = self._valores_rs(texto) or self._valores_rs(texto_card)
+            preco = f"R$ {valores[0][1]}" if valores else ""
 
-            if not titulo_tag and not preco_match:
+            # Ícones do cartão: '52m² 2 2 1' = área, quartos, banheiros, vagas
+            icones = re.search(r"(\d+(?:[.,]\d+)?)\s*m²\s+(\d+)\s+(\d+)\s+(\d+)(?!\s*[\d.,]*\s*m²)", texto)
+            area_match = re.search(r"(\d+(?:[.,]\d+)?)\s*m²", texto) or re.search(
+                r"(\d+(?:[.,]\d+)?)\s*m²", texto_card
+            )
+            if icones:
+                area, quartos, banheiros, vagas = icones.group(1), icones.group(2), icones.group(3), icones.group(4)
+            else:
+                area = area_match.group(1) if area_match else ""
+                q = re.search(r"(\d+)\s*quarto", texto_card, re.IGNORECASE)
+                b_ = re.search(r"(\d+)\s*banheiro", texto_card, re.IGNORECASE)
+                v = re.search(r"(\d+)\s*vaga", texto_card, re.IGNORECASE)
+                quartos = q.group(1) if q else ""
+                banheiros = b_.group(1) if b_ else ""
+                vagas = v.group(1) if v else ""
+
+            if not titulo and not preco:
                 continue
 
             resultados.append(
                 {
                     "fonte": self.nome_fonte,
-                    "titulo": titulo_tag.get_text(strip=True) if titulo_tag else "Anúncio OLX",
-                    "preco": preco_match.group(0) if preco_match else "",
+                    "titulo": titulo or "Anúncio OLX",
+                    "preco": preco,
                     "bairro": "",
-                    "area": area_match.group(1) if area_match else "",
-                    "quartos": quartos_match.group(1) if quartos_match else "",
-                    "banheiros": banheiros_match.group(1) if banheiros_match else "",
-                    "vagas": vagas_match.group(1) if vagas_match else "",
-                    "condominio": "",
-                    "iptu": "",
+                    "area": area,
+                    "quartos": quartos,
+                    "banheiros": banheiros,
+                    "vagas": vagas,
+                    "condominio": self._rotulado(texto_card, "Condom[ií]nio"),
+                    "iptu": self._rotulado(texto_card, "IPTU"),
                     "detalhes": texto_card,
                     "descricao": "",
                     "url": link_tag["href"] if link_tag else "",
