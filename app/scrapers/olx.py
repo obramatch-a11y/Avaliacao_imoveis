@@ -136,11 +136,11 @@ class OLXScraper(BaseScraper):
         urls_vistas: set[str] = set()
 
         # Proxy residencial opcional (ex.: http://usuario:senha@host:porta), definido no Render
-        proxy_url = os.getenv("OLX_PROXY_URL") or None
+        proxy_url = "".join((os.getenv("OLX_PROXY_URL") or "").split()) or None
         verificar_ssl = os.getenv("OLX_PROXY_VERIFY_SSL", "true").lower() != "false"
         # API de scraping opcional: modelo de URL com {url}, ex.:
         # https://api.scrapingant.com/v2/general?url={url}&x-api-key=CHAVE&proxy_country=BR
-        modelo_api = os.getenv("OLX_FETCH_TEMPLATE") or None
+        modelo_api = "".join((os.getenv("OLX_FETCH_TEMPLATE") or "").split()) or None
         if not proxy_url and not modelo_api:
             self.diagnostico.append(
                 "Sem proxy/API configurado (OLX_FETCH_TEMPLATE ou OLX_PROXY_URL): "
