@@ -332,6 +332,8 @@
       form.grid { grid-template-columns: minmax(0, 1fr); } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi strong { font-size: 19px; } .kpi.hero { grid-column: 1 / -1; }
       .galeria { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 10px; } .gc .pr { font-size: 15px; } .gc .bd { padding: 8px 10px; } .th .cn { font-size: 10px; } .col-x { display: none; } .actions .btn { flex: 1; } .fab { gap: 4px; padding: 6px; flex-wrap: nowrap; } .fab .btn { padding: 0 9px; height: 34px; font-size: 12.5px; } .fab .cnt { padding: 0 4px; font-size: 12px; } #fCopy { display: none; } .search { max-width: none; } .ib.hide-s { display: none; } .tools select { flex: 1; }
     }
+    #k-grau { white-space: normal; font-size: 15px !important; }
+    @media (max-width: 420px) { .logo { display: none; } .brand b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; } .fab .cnt, #fRedo { display: none; } .fab .btn { padding: 0 9px; font-size: 12px; } .fab { bottom: 10px; } }
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
     ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
   </style>
