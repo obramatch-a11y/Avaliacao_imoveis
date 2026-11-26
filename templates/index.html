@@ -433,6 +433,8 @@
                 <span style="font-size:12px;font-weight:600;color:var(--muted)">Fontes:</span>
                 <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="checkbox" name="fontes" value="olx" checked> OLX</label>
                 <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="checkbox" name="fontes" value="chaves" checked> Chaves na Mão</label>
+                <span class="pill" id="chStatus" style="margin-left:auto">Importação da OLX: verificando…</span>
+                <button type="button" class="btn" id="chAbrirDlg">Liberar importação</button>
               </fieldset>
               <datalist id="cidadesDl"></datalist>
               <div class="actions">
@@ -594,6 +596,22 @@
     <button class="btn pri" type="button" id="fCsv">CSV numérico</button>
   </div>
 
+  <dialog class="cmp" id="dlgChave" aria-label="Liberar a importação de anúncios">
+    <div style="padding:18px 20px;display:grid;gap:12px;max-width:520px">
+      <h2 style="margin:0;font-size:18px">Liberar a importação de anúncios</h2>
+      <p class="note" style="margin:0">A OLX bloqueia consultas feitas direto por servidores. Para importar, usamos o serviço gratuito <b>ScrapingAnt</b>, com a <b>sua própria conta</b>: assim a cota gratuita é sua e não divide com ninguém. <b>Este login é do ScrapingAnt, não do nosso app</b>: a senha fica só com eles e nós nunca a vemos.</p>
+      <ol style="margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px">
+        <li><button type="button" class="btn pri" id="chAbrir">Entrar ou criar conta no ScrapingAnt</button> <small class="muted">(abre numa janela separada)</small></li>
+        <li>No painel, clique no ícone de <b>copiar</b> ao lado de “API token”.</li>
+        <li><button type="button" class="btn" id="chLer">Já copiei: liberar</button> <small class="muted">(o app lê a chave copiada e testa sozinho)</small></li>
+      </ol>
+      <details><summary class="muted" style="cursor:pointer;font-size:13px">Prefere colar a chave manualmente?</summary>
+        <div style="display:flex;gap:8px;margin-top:8px"><input id="chManual" placeholder="Cole aqui o API token" autocomplete="off" style="flex:1;height:38px;padding:0 10px;font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px"><button type="button" class="btn" id="chUsar">Usar</button></div></details>
+      <p id="chMsg" role="status" style="margin:0;font-size:14px"></p>
+      <p class="note g" style="margin:0">A chave fica guardada só neste aparelho e é enviada ao nosso servidor apenas durante a sua busca, sem ser registrada nem salva.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn" id="chRemover" hidden>Remover chave deste aparelho</button><button type="button" class="btn" id="chFechar">Fechar</button></div>
+    </div>
+  </dialog>
   <dialog class="pal" id="pal" aria-label="Paleta de comandos">
     <input id="palQ" type="text" placeholder="Digite um comando, bairro ou busca recente…" aria-label="Pesquisar comandos" autocomplete="off" />
     <ul id="palL" role="listbox"></ul>
@@ -707,12 +725,38 @@
       $("#proximaTx").textContent = j.encontrados + " imóveis até agora. Você pode interromper a qualquer momento.";
       if (j.estado === "erro") return falha(j.erro);
       if (j.estado === "concluida" || j.estado === "interrompida") { fim(); location.href = "/coleta/" + jobId + "/resultado"; } }).catch(function () { /* falha de rede passageira: tenta de novo no próximo ciclo */ }); }
+
+    /* ---------- Liberar importação (chave do ScrapingAnt da própria pessoa) ---------- */
+    var CHAVE = ""; try { CHAVE = localStorage.getItem("ie-chave") || ""; } catch (e) {}
+    var canalServidor = true, dlgC = $("#dlgChave");
+    function chStatus() { var el = $("#chStatus"), ok = !!CHAVE; el.textContent = ok ? "Importação da OLX: liberada ✓" : (canalServidor ? "Importação da OLX: canal do servidor" : "Importação da OLX: precisa liberar"); el.classList.toggle("w", !ok && !canalServidor); $("#chRemover").hidden = !ok; $("#chAbrirDlg").textContent = ok ? "Trocar chave" : "Liberar importação"; }
+    fetch("/canal").then(function (r) { return r.json(); }).then(function (j) { canalServidor = !!j.servidor; chStatus(); }).catch(function () { chStatus(); }); chStatus();
+    function chMsg(t, erro) { var m = $("#chMsg"); m.textContent = t; m.style.color = erro ? "var(--bad, #b3261e)" : "var(--ok)"; }
+    function chValidar(texto) {
+      var c = (texto || "").trim(); if (!c) return chMsg("Não encontrei nada copiado. Copie o “API token” e tente de novo.", true);
+      chMsg("Testando a chave…"); var fd = new FormData(); fd.append("chave", c);
+      fetch("/chave/validar", { method: "POST", body: fd }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j.ok) { CHAVE = c; try { localStorage.setItem("ie-chave", c); } catch (e) {} chStatus();
+          chMsg("Importação liberada ✓" + (j.restantes != null ? " · " + nf0.format(j.restantes) + (j.total ? " de " + nf0.format(j.total) : "") + " créditos restantes" : "")); toast("Importação liberada"); setTimeout(function () { if (dlgC.open) dlgC.close(); }, 1400); }
+        else if (j.incerto) { chMsg(j.erro + " Se tiver certeza de que a chave está certa, clique em “Usar” para guardá-la mesmo assim.", true); $("#chManual").value = c; }
+        else chMsg(j.erro || "Chave não aceita.", true); }).catch(function () { chMsg("Sem conexão com o servidor. Tente de novo.", true); });
+    }
+    function chLer() { if (!navigator.clipboard || !navigator.clipboard.readText) return chMsg("Seu navegador não deixa ler a área de transferência. Use “colar a chave manualmente”.", true);
+      navigator.clipboard.readText().then(chValidar).catch(function () { chMsg("O navegador não permitiu ler o que você copiou. Permita o acesso ou cole a chave manualmente.", true); }); }
+    $("#chAbrirDlg").addEventListener("click", function () { chMsg(""); dlgC.showModal(); });
+    $("#chAbrir").addEventListener("click", function () { chMsg("Entre no ScrapingAnt, copie o API token e volte aqui."); window.open("https://app.scrapingant.com/signup", "scrapingant", "popup,width=520,height=760"); });
+    $("#chLer").addEventListener("click", chLer); $("#chUsar").addEventListener("click", function () { var c = $("#chManual").value.trim(); if (!c) return chMsg("Cole a chave no campo.", true); chValidar(c); });
+    $("#chFechar").addEventListener("click", function () { dlgC.close(); });
+    $("#chRemover").addEventListener("click", function () { CHAVE = ""; try { localStorage.removeItem("ie-chave"); } catch (e) {} chStatus(); chMsg("Chave removida deste aparelho."); });
+    addEventListener("focus", function () { if (dlgC.open && !CHAVE && navigator.clipboard && navigator.clipboard.readText && /(ScrapingAnt|Entre)/.test($("#chMsg").textContent)) navigator.clipboard.readText().then(function (t) { if (/^[A-Za-z0-9_-]{16,80}$/.test((t || "").trim())) chValidar(t); }).catch(function () { /* sem permissão: o botão “Já copiei” continua disponível */ }); });
     form.addEventListener("submit", function (e) {
       if (!window.fetch || !window.FormData) { document.body.classList.add("loading"); return; }
-      e.preventDefault(); guardarRecente(); var b = $("#btnBuscar"); b.classList.add("busy"); b.disabled = true; $("#btnTxt").textContent = "Coletando…";
+      e.preventDefault();
+      var temOlx = $$('input[name="fontes"]:checked', form).some(function (c) { return c.value === "olx"; });
+      if (temOlx && !CHAVE && !canalServidor) { chMsg("Para importar da OLX, libere a importação primeiro."); dlgC.showModal(); return; } guardarRecente(); var b = $("#btnBuscar"); b.classList.add("busy"); b.disabled = true; $("#btnTxt").textContent = "Coletando…";
       $$("#kpis, #sec-graf, #sec-tab").forEach(function (el) { el.style.display = "none"; }); $("#sec-param").classList.remove("open");
       var pr = $("#prog"); pr.classList.add("on"); $("#progX").hidden = false; $("#progX").disabled = false; $("#progT").textContent = "Iniciando coleta…"; $("#progD").textContent = ""; $("#progL").textContent = ""; $("#progB").style.width = "4%";
-      fetch("/coleta", { method: "POST", body: new FormData(form) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
+      fetch("/coleta", { method: "POST", body: (function () { var fd = new FormData(form); if (CHAVE) fd.append("chave", CHAVE); return fd; })() }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
         if (!x.ok) return falha(x.j.erro || "Confira os campos informados."); jobId = x.j.id; poll(); pollT = setInterval(poll, 1500); }).catch(function () { falha("Sem conexão com o servidor. Verifique a internet e tente de novo."); }); });
     var pxb = $("#parcX"); if (pxb) pxb.addEventListener("click", function () { this.disabled = true; this.textContent = "Interrompendo…"; fetch("/coleta/" + this.getAttribute("data-job") + "/cancelar", { method: "POST" }).then(function () { setTimeout(function () { location.reload(); }, 3500); }); });
     $("#parcLink").addEventListener("click", function (e) { e.preventDefault(); if (jobId) location.href = "/coleta/" + jobId + "/resultado"; });
@@ -769,7 +813,7 @@
     $("#lbObs").addEventListener("input", function () { if (!lbR) return; var k = chave(lbR); if (this.value) OBS[k] = this.value; else delete OBS[k]; gravar("ie-obs", OBS); });
     $("#lbMain").addEventListener("click", function () { if (!lbR || !lbF.length) return; PRINC[chave(lbR)] = lbF[lbI]; gravar("ie-princ", PRINC); pintarFotos(); desenharGaleria(); toast("Foto principal definida"); });
     $("#lbMore").addEventListener("click", function () { var r = lbR, b = this; if (!r) return; b.disabled = true; b.textContent = "Carregando…";
-      fetch("/fotos/" + encodeURIComponent(r.id)).then(function (x) { return x.json(); }).then(function (j) {
+      fetch("/fotos/" + encodeURIComponent(r.id), { headers: { "X-Chave-Api": CHAVE || "" } }).then(function (x) { return x.json(); }).then(function (j) {
         var novas = (j.fotos || []).filter(function (u) { return typeof u === "string"; });
         if (novas.length > r.fotos.length || !r.fotos.length) { r.fotos = novas; lbF = ordemFotos(r); lbI = 0; lbDesenha(); pintarFotos(); desenharGaleria(); toast(novas.length + " foto(s) carregada(s)"); }
         else toast(j.aviso || "Estas já são todas as fotos disponíveis"); }).catch(function () { toast("Não foi possível carregar agora. Tente novamente."); })

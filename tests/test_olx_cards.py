@@ -116,3 +116,42 @@ def test_correcoes_do_avaliador_na_exportacao():
     aplicar_correcoes(r, '{"1": {"valor": 480000, "area": 100, "q": 3}}')
     assert (r[0].valor_oferta, r[0].area_m2, r[0].quartos, r[0].valor_m2) == (480000.0, 100.0, 3, 4800.0)
     aplicar_correcoes(r, "lixo")
+
+
+def test_chave_do_usuario_vira_canal_de_coleta(monkeypatch):
+    from app.main import chave_valida
+    from app.scrapers.olx import OLXScraper
+    monkeypatch.delenv("OLX_FETCH_TEMPLATE", raising=False)
+    assert chave_valida("abc") is None and chave_valida("x y z " * 5) is None and chave_valida("a" * 10 + "<script>") is None
+    k = "0123456789abcdef0123456789abcdef"
+    assert chave_valida(f"  {k}\n") == k
+    assert OLXScraper()._modelo_api() is None
+    m = OLXScraper(k)._modelo_api()
+    assert m.startswith("https://api.scrapingant.com/v2/general?url={url}") and k in m
+
+
+def test_validar_chave_respostas(monkeypatch):
+    import asyncio
+    import httpx
+    from app import main
+    k = "0123456789abcdef0123456789abcdef"
+
+    class Resp:
+        def __init__(self, c, j=None): self.status_code, self._j = c, j or {}
+        def json(self): return self._j
+
+    def falso(codigo, j=None):
+        class Cli:
+            def __init__(self, *a, **kw): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+            async def get(self, *a, **kw): return Resp(codigo, j)
+        return Cli
+
+    monkeypatch.setattr(httpx, "AsyncClient", falso(200, {"remained_credits": 9000, "plan_total_credits": 10000}))
+    assert asyncio.run(main.validar_chave(k)) == {"ok": True, "restantes": 9000, "total": 10000}
+    monkeypatch.setattr(httpx, "AsyncClient", falso(403))
+    assert asyncio.run(main.validar_chave(k))["ok"] is False
+    monkeypatch.setattr(httpx, "AsyncClient", falso(500))
+    assert asyncio.run(main.validar_chave(k)).get("incerto") is True
+    assert asyncio.run(main.validar_chave("lixo"))["ok"] is False

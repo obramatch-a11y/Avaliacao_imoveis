@@ -1,3 +1,6 @@
+import httpx
+import os
+import re
 import json
 from fastapi.responses import JSONResponse
 from datetime import datetime
@@ -15,11 +18,13 @@ from app.scrapers.olx import OLXScraper
 FONTES = {"olx": OLXScraper, "chaves": ChavesNaMaoScraper}
 
 
-async def coletar_fontes(params, fontes, ao_progredir=None, cancelado=None):
+async def coletar_fontes(params, fontes, ao_progredir=None, cancelado=None, chave_api=None):
     """Roda as fontes escolhidas em paralelo; uma fonte com falha não derruba as outras."""
     import asyncio
     escolhidas = [k for k in fontes if k in FONTES] or ["olx"]
     scrapers = [FONTES[k]() for k in escolhidas]
+    for sc in scrapers:
+        sc.chave_api = chave_api
     por_fonte: dict[str, list[dict]] = {}
 
     def mk(sc):
@@ -43,6 +48,40 @@ async def coletar_fontes(params, fontes, ao_progredir=None, cancelado=None):
     return brutos, diag
 
 app = FastAPI(title="Inferência Estatística", version="0.2.0")
+
+
+def chave_valida(texto: str) -> str | None:
+    """Aceita só o formato de um token (letras, números, - e _). Nunca é registrada em log."""
+    t = (texto or "").strip()
+    return t if re.fullmatch(r"[A-Za-z0-9_-]{16,80}", t) else None
+
+
+@app.get("/canal")
+async def canal():
+    """Informa se o servidor já tem um canal de coleta próprio (sem precisar da chave da pessoa)."""
+    return {"servidor": bool(("".join((os.getenv("OLX_FETCH_TEMPLATE") or "").split())) or os.getenv("OLX_PROXY_URL"))}
+
+
+@app.post("/chave/validar")
+async def validar_chave(chave: str = Form("")):
+    """Testa a chave do ScrapingAnt consultando só o saldo de créditos. Não guarda nada no servidor."""
+    c = chave_valida(chave)
+    if not c:
+        return {"ok": False, "erro": "Isto não parece uma chave do ScrapingAnt. Copie o campo “API token” do painel."}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as cli:
+            r = await cli.get("https://api.scrapingant.com/v2/usage", params={"x-api-key": c})
+    except Exception:
+        return {"ok": False, "incerto": True, "erro": "Não consegui falar com o ScrapingAnt agora. Tente de novo em instantes."}
+    if r.status_code in (401, 403, 422):
+        return {"ok": False, "erro": "O ScrapingAnt não reconheceu esta chave. Confira se copiou o token inteiro."}
+    if r.status_code != 200:
+        return {"ok": False, "incerto": True, "erro": "O ScrapingAnt não respondeu como esperado. Tente de novo em instantes."}
+    try:
+        j = r.json()
+    except ValueError:
+        j = {}
+    return {"ok": True, "restantes": j.get("remained_credits"), "total": j.get("plan_total_credits")}
 templates = Jinja2Templates(directory="templates")
 
 ULTIMA_COLETA: list[AmostraMercado] = []
@@ -111,7 +150,7 @@ async def _rodar_job(job_id: str):
         ]
 
     try:
-        brutos, diag = await coletar_fontes(job["params"], job["fontes"], ao_progredir=progresso, cancelado=lambda: job["cancelar"])
+        brutos, diag = await coletar_fontes(job["params"], job["fontes"], ao_progredir=progresso, cancelado=lambda: job["cancelar"], chave_api=job.get("chave"))
         job["resultado"] = normalizar_lista(brutos, job["params"])
         job["diagnostico"] = diag
         job["estado"] = "interrompida" if job["cancelar"] else "concluida"
@@ -127,6 +166,7 @@ async def iniciar_coleta(
     quartos_min: Optional[str] = Form(None), preco_min: Optional[str] = Form(None), preco_max: Optional[str] = Form(None),
     limite_paginas: int = Form(2),
     fontes: list[str] = Form(default=["olx", "chaves"]),
+    chave: str = Form(""),
 ):
     import asyncio
     import time
@@ -147,7 +187,7 @@ async def iniciar_coleta(
     job_id = uuid.uuid4().hex[:12]
     JOBS[job_id] = {
         "params": params, "fontes": fontes, "estado": "rodando", "pagina": 0, "encontrados": 0,
-        "previa": [], "parcial": [], "cancelar": False, "resultado": None, "diagnostico": [], "erro": "", "inicio": time.time(),
+        "chave": chave_valida(chave), "previa": [], "parcial": [], "cancelar": False, "resultado": None, "diagnostico": [], "erro": "", "inicio": time.time(),
     }
     JOBS[job_id]["tarefa"] = asyncio.create_task(_rodar_job(job_id))
     return {"id": job_id}
@@ -289,7 +329,7 @@ FOTOS_CACHE: dict[int, list[str]] = {}
 
 
 @app.get("/fotos/{id_amostra}")
-async def fotos_amostra(id_amostra: int):
+async def fotos_amostra(id_amostra: int, request: Request):
     """Carrega a galeria completa de um anúncio sob demanda (com cache; não bloqueia a coleta)."""
     amostra = next((a for a in ULTIMA_COLETA if a.id_amostra == id_amostra), None)
     if amostra is None:
@@ -297,7 +337,7 @@ async def fotos_amostra(id_amostra: int):
     if id_amostra in FOTOS_CACHE:
         return {"fotos": FOTOS_CACHE[id_amostra], "cache": True}
     try:
-        fotos = await OLXScraper().fotos_do_anuncio(amostra.url_anuncio)
+        fotos = await OLXScraper(chave_valida(request.headers.get("x-chave-api", ""))).fotos_do_anuncio(amostra.url_anuncio)
     except Exception:
         fotos = []
     if not fotos:

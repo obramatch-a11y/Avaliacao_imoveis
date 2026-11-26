@@ -36,7 +36,9 @@ class OLXScraper(BaseScraper):
         "LOCACAO": "aluguel",
     }
 
-    def __init__(self):
+    def __init__(self, chave_api: str | None = None):
+        # Chave do ScrapingAnt da própria pessoa (vem do navegador dela; fica só em memória durante a coleta)
+        self.chave_api = chave_api or None
         self.diagnostico: list[str] = []
         self.debug: dict = {"urls": [], "parser": [], "amostra_bruta": [], "trecho_html": ""}
 
@@ -234,13 +236,18 @@ class OLXScraper(BaseScraper):
             )
         return resultados
 
+    def _modelo_api(self) -> str | None:
+        if self.chave_api:
+            return f"https://api.scrapingant.com/v2/general?url={{url}}&x-api-key={self.chave_api}&proxy_country=BR"
+        return "".join((os.getenv("OLX_FETCH_TEMPLATE") or "").split()) or None
+
     async def fotos_do_anuncio(self, url: str) -> list[str]:
         """Busca a página pública do anúncio e extrai as fotos. Usa o mesmo canal da coleta."""
         if not host_permitido(url):
             return []
         proxy_url = "".join((os.getenv("OLX_PROXY_URL") or "").split()) or None
         verificar_ssl = os.getenv("OLX_PROXY_VERIFY_SSL", "true").lower() != "false"
-        modelo_api = "".join((os.getenv("OLX_FETCH_TEMPLATE") or "").split()) or None
+        modelo_api = self._modelo_api()
         async with httpx.AsyncClient(
             headers=self.HEADERS, timeout=90.0 if (proxy_url or modelo_api) else 20.0,
             follow_redirects=False, proxy=proxy_url, verify=verificar_ssl,
@@ -275,7 +282,7 @@ class OLXScraper(BaseScraper):
         verificar_ssl = os.getenv("OLX_PROXY_VERIFY_SSL", "true").lower() != "false"
         # API de scraping opcional: modelo de URL com {url}, ex.:
         # https://api.scrapingant.com/v2/general?url={url}&x-api-key=CHAVE&proxy_country=BR
-        modelo_api = "".join((os.getenv("OLX_FETCH_TEMPLATE") or "").split()) or None
+        modelo_api = self._modelo_api()
         if not proxy_url and not modelo_api:
             self.diagnostico.append(
                 "Sem proxy/API configurado (OLX_FETCH_TEMPLATE ou OLX_PROXY_URL): "
