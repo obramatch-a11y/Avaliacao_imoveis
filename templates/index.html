@@ -405,6 +405,11 @@
                 <input id="pmin" type="number" step="1000" name="preco_min" placeholder="200000" inputmode="numeric" value="{{ filtros.get('preco_min') | int if filtros.get('preco_min') else '' }}" /></div>
               <div class="f"><label for="pmax">Preço máximo (R$)</label>
                 <input id="pmax" type="number" step="1000" name="preco_max" placeholder="600000" inputmode="numeric" value="{{ filtros.get('preco_max') | int if filtros.get('preco_max') else '' }}" /></div>
+              <fieldset class="f" style="grid-column:1/-1;border:0;padding:0;margin:0;display:flex;gap:16px;flex-wrap:wrap;align-items:center"><legend class="sr">Fontes</legend>
+                <span style="font-size:12px;font-weight:600;color:var(--muted)">Fontes:</span>
+                <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="checkbox" name="fontes" value="olx" checked> OLX</label>
+                <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="checkbox" name="fontes" value="chaves" checked> Chaves na Mão</label>
+              </fieldset>
               <datalist id="cidadesDl"></datalist>
               <div class="actions">
                 <button type="button" class="btn" id="bLimpar">Limpar filtros</button>
@@ -479,7 +484,7 @@
               <th class="s n" data-k="q" data-t="num">Qts<span class="ar"></span></th>
               <th class="s n" data-k="vagas" data-t="num">Vagas<span class="ar"></span></th>
               <th class="s n col-x" data-k="andar" data-t="num">Andar<span class="ar"></span></th>
-              <th class="n col-x">Elev.</th><th class="n col-x">Pisc.</th><th>Link</th>
+              <th class="col-x">Fonte</th><th class="n col-x">Elev.</th><th class="n col-x">Pisc.</th><th>Link</th>
             </tr></thead>
             <tbody>
               {% for a in amostras %}
@@ -498,6 +503,7 @@
                 <td class="n">{{ a.quartos if a.quartos is not none else '–' }}</td>
                 <td class="n">{{ a.vagas }}</td>
                 <td class="n col-x">{{ a.andar if a.andar is not none else '–' }}</td>
+                <td class="col-x">{{ a.fonte }}</td>
                 <td class="n col-x">{{ 'Sim' if a.elevador else '–' }}</td>
                 <td class="n col-x">{{ 'Sim' if a.piscina else '–' }}</td>
                 <td>{% if a.url_anuncio %}<a href="{{ a.url_anuncio }}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>{% endif %}</td>

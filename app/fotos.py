@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup, Tag
 
 # Só aceitamos links https de domínios do próprio OLX (evita SSRF e conteúdo de terceiros).
-DOMINIOS_OK = ("olx.com.br", "olxcdn.com")
+DOMINIOS_OK = ("olx.com.br", "olxcdn.com", "chavesnamao.com.br")
 EXT_RUINS = (".svg", ".gif", ".ico")
 PALAVRAS_RUINS = ("logo", "icon", "placeholder", "avatar", "sprite", "banner")
 MAX_FOTOS = 30

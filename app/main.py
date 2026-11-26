@@ -7,7 +7,38 @@ from fastapi.templating import Jinja2Templates
 from app.exporter import gerar_csv
 from app.models import AmostraMercado, BuscaImovelInput
 from app.normalizer import normalizar_registro_bruto
+from app.scrapers.chaves import ChavesNaMaoScraper
 from app.scrapers.olx import OLXScraper
+
+FONTES = {"olx": OLXScraper, "chaves": ChavesNaMaoScraper}
+
+
+async def coletar_fontes(params, fontes, ao_progredir=None, cancelado=None):
+    """Roda as fontes escolhidas em paralelo; uma fonte com falha não derruba as outras."""
+    import asyncio
+    escolhidas = [k for k in fontes if k in FONTES] or ["olx"]
+    scrapers = [FONTES[k]() for k in escolhidas]
+    por_fonte: dict[str, list[dict]] = {}
+
+    def mk(sc):
+        def cb(pagina, lista):
+            por_fonte[sc.nome_fonte] = lista
+            if ao_progredir:
+                ao_progredir(pagina, [i for l in por_fonte.values() for i in l])
+        return cb
+
+    resultados = await asyncio.gather(
+        *[sc.buscar(params, ao_progredir=mk(sc), cancelado=cancelado) for sc in scrapers], return_exceptions=True
+    )
+    brutos, diag = [], []
+    for sc, r in zip(scrapers, resultados):
+        if isinstance(r, Exception):
+            diag.append(f"{sc.nome_fonte}: não foi possível consultar agora ({type(r).__name__}).")
+            continue
+        brutos += r
+        diag += [f"{sc.nome_fonte}: {d}" for d in sc.diagnostico]
+        diag.append(f"{sc.nome_fonte}: {len(r)} anúncio(s) coletado(s).")
+    return brutos, diag
 
 app = FastAPI(title="Inferência Estatística", version="0.2.0")
 templates = Jinja2Templates(directory="templates")
@@ -69,7 +100,6 @@ JOBS: dict[str, dict] = {}
 
 async def _rodar_job(job_id: str):
     job = JOBS[job_id]
-    scraper: OLXScraper = job["scraper"]
 
     def progresso(pagina: int, coletados: list[dict]):
         job["pagina"] = pagina
@@ -79,9 +109,9 @@ async def _rodar_job(job_id: str):
         ]
 
     try:
-        brutos = await scraper.buscar(job["params"], ao_progredir=progresso, cancelado=lambda: job["cancelar"])
+        brutos, diag = await coletar_fontes(job["params"], job["fontes"], ao_progredir=progresso, cancelado=lambda: job["cancelar"])
         job["resultado"] = normalizar_lista(brutos, job["params"])
-        job["diagnostico"] = scraper.diagnostico
+        job["diagnostico"] = diag
         job["estado"] = "interrompida" if job["cancelar"] else "concluida"
     except Exception as exc:  # noqa: BLE001
         job["estado"] = "erro"
@@ -94,6 +124,7 @@ async def iniciar_coleta(
     tipo_imovel: str = Form("APARTAMENTO"), area_min: Optional[str] = Form(None), area_max: Optional[str] = Form(None),
     quartos_min: Optional[str] = Form(None), preco_min: Optional[str] = Form(None), preco_max: Optional[str] = Form(None),
     limite_paginas: int = Form(2),
+    fontes: list[str] = Form(default=["olx", "chaves"]),
 ):
     import asyncio
     import time
@@ -113,7 +144,7 @@ async def iniciar_coleta(
         JOBS.pop(antigo, None)
     job_id = uuid.uuid4().hex[:12]
     JOBS[job_id] = {
-        "params": params, "scraper": OLXScraper(), "estado": "rodando", "pagina": 0, "encontrados": 0,
+        "params": params, "fontes": fontes, "estado": "rodando", "pagina": 0, "encontrados": 0,
         "previa": [], "cancelar": False, "resultado": None, "diagnostico": [], "erro": "", "inicio": time.time(),
     }
     JOBS[job_id]["tarefa"] = asyncio.create_task(_rodar_job(job_id))
@@ -221,6 +252,7 @@ async def executar_busca(
     preco_min: Optional[str] = Form(None),
     preco_max: Optional[str] = Form(None),
     limite_paginas: int = Form(2),
+    fontes: list[str] = Form(default=["olx", "chaves"]),
 ):
     global ULTIMA_COLETA
 
@@ -238,10 +270,9 @@ async def executar_busca(
         limite_paginas=limite_paginas,
     )
 
-    scraper = OLXScraper()
-    brutos = await scraper.buscar(params)
+    brutos, diag = await coletar_fontes(params, fontes)
     ULTIMA_COLETA = normalizar_lista(brutos, params)
-    return _resposta_resultado(request, ULTIMA_COLETA, params, scraper.diagnostico)
+    return _resposta_resultado(request, ULTIMA_COLETA, params, diag)
 
 
 FOTOS_CACHE: dict[int, list[str]] = {}

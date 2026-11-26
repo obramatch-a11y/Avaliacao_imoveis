@@ -46,7 +46,7 @@ def test_coleta_assincrona_com_cancelamento(monkeypatch):
 
     monkeypatch.setattr(m.OLXScraper, "buscar", falso_buscar)
     with TestClient(m.app) as c:
-        r = c.post("/coleta", data={"uf": "PE", "cidade": "Recife", "limite_paginas": 3})
+        r = c.post("/coleta", data={"uf": "PE", "cidade": "Recife", "limite_paginas": 3, "fontes": "olx"})
         jid = r.json()["id"]
         time.sleep(0.3)
         c.post(f"/coleta/{jid}/cancelar")
@@ -57,3 +57,15 @@ def test_coleta_assincrona_com_cancelamento(monkeypatch):
             time.sleep(0.1)
         assert st["estado"] == "interrompida" and 1 <= st["encontrados"] < 3
         assert "Apto 1" in c.get(f"/coleta/{jid}/resultado").text
+
+
+def test_chaves_na_mao_cartao():
+    from app.models import BuscaImovelInput
+    from app.scrapers.chaves import ChavesNaMaoScraper
+    sc = ChavesNaMaoScraper()
+    p = BuscaImovelInput(uf="PE", cidade="Jaboatão dos Guararapes", bairro="Piedade", finalidade="VENDA", tipo_imovel="APARTAMENTO")
+    assert sc._montar_url(p, 2) == "https://www.chavesnamao.com.br/apartamentos-a-venda/pe-jaboatao-dos-guararapes/?pg=2"
+    html = '<a href="/imovel/apartamento-a-venda-2-quartos-com-garagem-pe-jaboatao-dos-guararapes-piedade-RS450000/id-1/" title="Apto 2 quartos"><img src="https://images.chavesnamao.com.br/x.jpg">59 m² 2 banheiros 1 vaga</a>'
+    it = sc._extrair_de_html_cards(BeautifulSoup(html, "lxml"))[0]
+    assert (it["preco"], it["bairro"], it["quartos"], it["area"], it["vagas"]) == ("R$ 450.000", "Piedade", "2", "59", "1")
+    assert it["fonte"] == "Chaves na Mão" and it["fotos"] == ["https://images.chavesnamao.com.br/x.jpg"]
