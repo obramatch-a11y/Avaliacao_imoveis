@@ -83,6 +83,8 @@ async def executar_busca(
     area_min: Optional[str] = Form(None),
     area_max: Optional[str] = Form(None),
     quartos_min: Optional[str] = Form(None),
+    preco_min: Optional[str] = Form(None),
+    preco_max: Optional[str] = Form(None),
     limite_paginas: int = Form(2),
 ):
     global ULTIMA_COLETA
@@ -96,6 +98,8 @@ async def executar_busca(
         area_min=float(area_min) if area_min else None,
         area_max=float(area_max) if area_max else None,
         quartos_min=int(quartos_min) if quartos_min else None,
+        preco_min=float(preco_min) if preco_min else None,
+        preco_max=float(preco_max) if preco_max else None,
         limite_paginas=limite_paginas,
     )
 
@@ -114,6 +118,11 @@ async def executar_busca(
             tipo_imovel=params.tipo_imovel,
             finalidade=params.finalidade,
         )
+        v = amostra.valor_oferta
+        if (params.preco_min and (v is None or v < params.preco_min)) or (
+            params.preco_max and (v is None or v > params.preco_max)
+        ):
+            continue
         assinatura = (
             amostra.bairro.lower(),
             amostra.area_m2,

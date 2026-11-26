@@ -357,7 +357,7 @@
         <li class="{{ '' if tem else 'pend' }}"><a href="#sec-tab"><b>5</b>Exportação</a></li>
       </ol>
       <div class="next" id="proxima"><small>Próxima ação</small><p id="proximaTx">{% if tem %}Revise a amostra.{% elif filtros %}Ajuste os filtros e colete novamente.{% else %}Informe UF e cidade para coletar as primeiras ofertas.{% endif %}</p></div>
-      <h3>Buscas recentes</h3>
+      <h3>Favoritas e recentes</h3>
       <ul class="hist" id="recentes"><li class="muted" style="padding:0 9px;font-size:12px">Nenhuma ainda.</li></ul>
       <h3>Atalhos</h3>
       <p class="muted" style="font-size:12px;margin:0"><kbd>Ctrl K</kbd> comandos · <kbd>/</kbd> buscar · <kbd>↑</kbd><kbd>↓</kbd> navegar · <kbd>Espaço</kbd> usar · <kbd>Ctrl Z</kbd> desfazer · <kbd>F</kbd> foco</p>
@@ -381,7 +381,7 @@
               <div class="f"><label for="uf">UF *</label>
                 <input id="uf" type="text" name="uf" maxlength="2" required placeholder="PE" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase" value="{{ filtros.get('uf', '') }}" /></div>
               <div class="f"><label for="cidade">Cidade *</label>
-                <input id="cidade" type="text" name="cidade" required placeholder="Jaboatão dos Guararapes" value="{{ filtros.get('cidade', '') }}" /></div>
+                <input id="cidade" type="text" name="cidade" list="cidadesDl" autocomplete="off" required placeholder="Jaboatão dos Guararapes" value="{{ filtros.get('cidade', '') }}" /></div>
               <div class="f"><label for="bairro">Bairro</label>
                 <input id="bairro" type="text" name="bairro" placeholder="Opcional" value="{{ filtros.get('bairro', '') }}" /></div>
               <div class="f"><label for="tipo">Tipo de imóvel</label>
@@ -395,7 +395,14 @@
               <div class="f"><label for="qts">Quartos (mín.) · Páginas</label>
                 <div class="pair"><input id="qts" type="number" name="quartos_min" placeholder="Quartos" inputmode="numeric" value="{{ filtros.get('quartos_min') or '' }}" />
                   <select name="limite_paginas" aria-label="Páginas">{% for n in [1, 2, 3] %}<option value="{{ n }}" {% if (filtros.get('limite_paginas') or 2) == n %}selected{% endif %}>{{ n }} pág.</option>{% endfor %}</select></div></div>
+              <div class="f"><label for="pmin">Preço mínimo (R$)</label>
+                <input id="pmin" type="number" step="1000" name="preco_min" placeholder="200000" inputmode="numeric" value="{{ filtros.get('preco_min') | int if filtros.get('preco_min') else '' }}" /></div>
+              <div class="f"><label for="pmax">Preço máximo (R$)</label>
+                <input id="pmax" type="number" step="1000" name="preco_max" placeholder="600000" inputmode="numeric" value="{{ filtros.get('preco_max') | int if filtros.get('preco_max') else '' }}" /></div>
+              <datalist id="cidadesDl"></datalist>
               <div class="actions">
+                <button type="button" class="btn" id="bLimpar">Limpar filtros</button>
+                <button type="button" class="btn" id="bFav" aria-pressed="false" title="Guardar esta pesquisa como favorita">☆ Favoritar</button>
                 <span class="help">Dica: deixe o bairro em branco para ampliar a amostra. Cada página reúne até ~50 ofertas.</span>
                 <button type="submit" class="btn pri" id="btnBuscar"><span class="spin" aria-hidden="true"></span><span id="btnTxt">Coletar amostras</span></button>
               </div>
@@ -587,7 +594,7 @@
     $("#side").addEventListener("click", function (e) { if (e.target.closest("a")) root.removeAttribute("data-nav"); });
 
     /* ---------- Formulário: salvar, recentes, carregamento ---------- */
-    var form = $("#formBusca"), CAMPOS = ["uf", "cidade", "bairro", "tipo_imovel", "finalidade", "area_min", "area_max", "quartos_min", "limite_paginas"];
+    var form = $("#formBusca"), CAMPOS = ["uf", "cidade", "bairro", "tipo_imovel", "finalidade", "area_min", "area_max", "quartos_min", "preco_min", "preco_max", "limite_paginas"];
     var saveEl = $("#save"), saveT;
     function marcarSalvo() { saveEl.classList.add("busy"); $(".tx", saveEl).textContent = "Salvando…"; clearTimeout(saveT);
       saveT = setTimeout(function () { try { var o = {}; CAMPOS.forEach(function (c) { o[c] = form.elements[c].value; }); localStorage.setItem("ie-form", JSON.stringify(o)); } catch (e) {}
@@ -601,11 +608,31 @@
       try { localStorage.setItem("ie-rec", JSON.stringify(l.slice(0, 6))); } catch (e) {} }
     function abrirParam() { var s = $("#sec-param"); s.classList.add("open"); $("#bEditar").setAttribute("aria-expanded", "true"); scrollTo({ top: 0 }); setTimeout(function () { $("#cidade").focus(); }, 60); }
     function preencher(o) { CAMPOS.forEach(function (c) { if (o[c] != null && form.elements[c]) form.elements[c].value = o[c]; }); marcarSalvo(); abrirParam(); toast("Busca carregada — confira e colete"); }
-    function listaRecentes() { var l = recentes(), ul = $("#recentes"); if (!l.length) return;
-      ul.innerHTML = l.map(function (x, i) { return '<li><button type="button" data-r="' + i + '">' + esc(x.rotulo.split(" — ")[0]) + "<small>" + esc(x.rotulo.split(" — ")[1] || "") + "</small></button></li>"; }).join(""); }
-    $("#recentes").addEventListener("click", function (e) { var b = e.target.closest("button[data-r]"); if (b) { preencher(recentes()[+b.getAttribute("data-r")]); root.removeAttribute("data-nav"); } });
+    function todas() { return favs().map(function (x) { return { x: x, f: 1 }; }).concat(recentes().filter(function (r) { return !favs().some(function (f) { return f.rotulo === r.rotulo; }); }).map(function (x) { return { x: x, f: 0 }; })); }
+    function listaRecentes() { var l = todas(), ul = $("#recentes"); if (!l.length) return;
+      ul.innerHTML = l.map(function (o, i) { var x = o.x; return '<li><button type="button" data-r="' + i + '">' + (o.f ? "★ " : "") + esc(x.rotulo.split(" — ")[0]) + "<small>" + esc(x.rotulo.split(" — ")[1] || "") + "</small></button></li>"; }).join(""); }
+    $("#recentes").addEventListener("click", function (e) { var b = e.target.closest("button[data-r]"); if (b) { preencher(todas()[+b.getAttribute("data-r")].x); root.removeAttribute("data-nav"); } });
     listaRecentes();
-    form.addEventListener("submit", function () {
+
+    /* ---------- Pesquisa: limpar, favoritas, autocomplete de cidade (IBGE) ---------- */
+    function favs() { try { return JSON.parse(localStorage.getItem("ie-fav") || "[]"); } catch (e) { return []; } }
+    function rotuloAtual() { var o = {}; CAMPOS.forEach(function (c) { o[c] = form.elements[c].value; }); return [o.cidade, o.bairro].filter(Boolean).join(" · ") + " — " + o.tipo_imovel.toLowerCase() + ", " + (o.finalidade === "VENDA" ? "venda" : "locação"); }
+    function marcaFav() { var r = rotuloAtual(), on = favs().some(function (x) { return x.rotulo === r; }), b = $("#bFav"); b.setAttribute("aria-pressed", on); b.textContent = (on ? "★ " : "☆ ") + "Favoritar"; }
+    $("#bFav").addEventListener("click", function () { if (!form.elements.cidade.value) return toast("Informe a cidade primeiro");
+      var r = rotuloAtual(), l = favs(), i = l.findIndex(function (x) { return x.rotulo === r; });
+      if (i > -1) { l.splice(i, 1); toast("Removida das favoritas"); } else { var o = {}; CAMPOS.forEach(function (c) { o[c] = form.elements[c].value; }); o.rotulo = r; l.unshift(o); toast("Pesquisa favoritada"); }
+      try { localStorage.setItem("ie-fav", JSON.stringify(l.slice(0, 12))); } catch (e) {} marcaFav(); listaRecentes(); });
+    $("#bLimpar").addEventListener("click", function () { CAMPOS.forEach(function (c) { var e = form.elements[c]; if (!e) return; if (c === "tipo_imovel") e.value = "APARTAMENTO"; else if (c === "finalidade") e.value = "VENDA"; else if (c === "limite_paginas") e.value = "2"; else e.value = ""; }); marcarSalvo(); marcaFav(); form.elements.cidade.focus(); toast("Filtros limpos"); });
+    form.addEventListener("input", marcaFav); form.addEventListener("change", marcaFav);
+    var cidT, cidUF = "";
+    function carregaCidades() { var uf = form.elements.uf.value.trim().toUpperCase(); if (uf.length !== 2 || uf === cidUF) return; cidUF = uf;
+      var k = "ie-cid-" + uf, c = null; try { c = JSON.parse(localStorage.getItem(k) || "null"); } catch (e) {}
+      function pinta(l) { $("#cidadesDl").innerHTML = l.map(function (n) { return '<option value="' + esc(n) + '">'; }).join(""); }
+      if (c) return pinta(c);
+      fetch("https://servicos.ibge.gov.br/api/v1/localidades/estados/" + uf + "/municipios").then(function (r) { return r.ok ? r.json() : []; }).then(function (j) {
+        var l = j.map(function (m) { return m.nome; }); if (l.length) { pinta(l); try { localStorage.setItem(k, JSON.stringify(l)); } catch (e) {} } }).catch(function () {}); }
+    form.elements.uf.addEventListener("input", function () { clearTimeout(cidT); cidT = setTimeout(carregaCidades, 300); }); carregaCidades(); marcaFav();
+        form.addEventListener("submit", function () {
       guardarRecente(); var b = $("#btnBuscar"); b.classList.add("busy"); b.disabled = true; $("#btnTxt").textContent = "Coletando… até 1 min";
       document.body.classList.add("loading"); $$("#kpis, #sec-graf, #sec-tab").forEach(function (e) { e.style.display = "none"; });
       $("#proximaTx").textContent = "Coletando ofertas… os resultados aparecem em instantes."; });
