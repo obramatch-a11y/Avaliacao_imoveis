@@ -43,3 +43,6 @@ class AmostraMercado(BaseModel):
     titulo_anuncio: str = ""
     url_anuncio: str = ""
     fotos: list[str] = Field(default_factory=list)
+    fora_filtros: bool = False
+    motivos: list[str] = Field(default_factory=list)
+    completude: int = 0

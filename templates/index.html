@@ -203,6 +203,8 @@
     tbody tr.hl td { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
     td.n, th.n { text-align: right; }
     .tag { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+    .tag.fora { background: var(--surface-3); color: var(--muted); }
+    tbody tr.fora td { opacity: .62; }
     .tag.ok { background: var(--ok-bg); color: var(--ok); } .tag.warn { background: var(--warn-bg); color: var(--warn); }
     input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
     .vazio { display: none; padding: 26px; text-align: center; color: var(--muted); }
@@ -494,7 +496,7 @@
         <div class="tools">
           <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
             <input id="busca" type="search" placeholder="Buscar na tabela ( / )" aria-label="Buscar na tabela" /></div>
-          <select id="fStatus" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="ok">Somente válidas</option><option value="alerta">Somente alertas</option></select>
+          <select id="fStatus" aria-label="Filtrar por status"><option value="">Compatíveis com os filtros</option><option value="ok">Somente sem alertas</option><option value="alerta">Somente com alertas</option><option value="fora">Fora dos filtros (auditoria)</option><option value="todos">Todos os coletados</option></select>
           <span class="chipf" id="chipBin" role="button" tabindex="0" aria-label="Limpar filtro do gráfico">Faixa do gráfico ✕</span>
           <span class="grow"></span><span class="muted num" id="contagem"></span>
           <span class="vw" role="group" aria-label="Modo de visualização"><button type="button" id="vTab" aria-pressed="true">Tabela</button><button type="button" id="vGal" aria-pressed="false">Galeria</button></span>
@@ -513,18 +515,18 @@
               <th class="s n" data-k="b" data-t="num">Banh.<span class="ar"></span></th>
               <th class="s n" data-k="vagas" data-t="num">Vagas<span class="ar"></span></th>
               <th class="s n col-x" data-k="andar" data-t="num">Andar<span class="ar"></span></th>
-              <th class="col-x">Fonte</th><th class="col-x">Coleta</th><th class="n col-x">Elev.</th><th class="n col-x">Pisc.</th><th>Link</th>
+              <th class="s n col-x" data-k="comp" data-t="num">Dados<span class="ar"></span></th><th class="col-x">Fonte</th><th class="col-x">Coleta</th><th class="n col-x">Elev.</th><th class="n col-x">Pisc.</th><th>Link</th>
             </tr></thead>
             <tbody>
               {% for a in amostras %}
-              <tr class="{% if a.alerta_saneamento != 'OK' %}alerta{% endif %}" tabindex="-1"
-                  data-id="{{ a.id_amostra }}" data-st="{{ 'ok' if a.alerta_saneamento == 'OK' else 'alerta' }}" data-stl="{{ a.alerta_saneamento }}"
+              <tr class="{% if a.fora_filtros %}fora{% elif a.alerta_saneamento != 'OK' %}alerta{% endif %}" tabindex="-1"
+                  data-id="{{ a.id_amostra }}" data-st="{{ 'fora' if a.fora_filtros else ('ok' if a.alerta_saneamento == 'OK' else 'alerta') }}" data-mot='{{ a.motivos|tojson }}' data-comp="{{ a.completude }}" data-stl="{{ a.alerta_saneamento }}"
                   data-bairro="{{ a.bairro }}" data-valor="{{ a.valor_oferta if a.valor_oferta is not none else '' }}" data-area="{{ a.area_m2 if a.area_m2 is not none else '' }}"
                   data-m2="{{ a.valor_m2 if a.valor_m2 is not none else '' }}" data-q="{{ a.quartos if a.quartos is not none else '' }}" data-vagas="{{ a.vagas }}" data-b="{{ a.banheiros if a.banheiros is not none else '' }}" data-fonte="{{ a.fonte }}"
                   data-andar="{{ a.andar if a.andar is not none else '' }}" data-url="{{ a.url_anuncio or '' }}" data-titulo="{{ a.titulo_anuncio }}" data-fotos='{{ a.fotos|tojson }}'>
-                <td><input type="checkbox" form="formExport" name="ids_selecionados" value="{{ a.id_amostra }}" aria-label="Usar amostra {{ a.id_amostra }}" {% if a.alerta_saneamento == 'OK' %}checked{% endif %}></td>
+                <td><input type="checkbox" form="formExport" name="ids_selecionados" value="{{ a.id_amostra }}" aria-label="Usar amostra {{ a.id_amostra }}" {% if a.alerta_saneamento == 'OK' and not a.fora_filtros %}checked{% endif %}></td>
                 <td class="ft"></td>
-                <td>{% if a.alerta_saneamento == 'OK' %}<span class="tag ok">Válida</span>{% else %}<span class="tag warn">{{ 'Possível outlier' if a.alerta_saneamento == 'POSSIVEL_OUTLIER' else (a.alerta_saneamento|replace('_', ' ')|capitalize) }}</span>{% endif %}</td>
+                <td>{% if a.fora_filtros %}<span class="tag fora" title="{{ a.motivos|join('. ') }}">Fora dos filtros</span>{% elif a.alerta_saneamento == 'OK' %}<span class="tag ok" title="{{ a.motivos|join('. ') }}">{{ 'Compatível' if not a.motivos else 'Compatível*' }}</span>{% else %}<span class="tag warn">{{ 'Possível outlier' if a.alerta_saneamento == 'POSSIVEL_OUTLIER' else (a.alerta_saneamento|replace('_', ' ')|capitalize) }}</span>{% endif %}</td>
                 <td>{% if a.bairro == 'NAO_INFORMADO' %}<span class="muted">Não informado</span>{% else %}{{ a.bairro }}{% endif %}</td>
                 <td class="n" data-f="valor"><strong>{{ a.valor_oferta or '–' }}</strong></td>
                 <td class="n" data-f="area">{{ a.area_m2 or '–' }}</td>
@@ -533,6 +535,7 @@
                 <td class="n">{{ a.banheiros if a.banheiros is not none else '–' }}</td>
                 <td class="n">{{ a.vagas }}</td>
                 <td class="n col-x">{{ a.andar if a.andar is not none else '–' }}</td>
+                <td class="n col-x num" title="Campos preenchidos: valor, área, quartos, banheiros, bairro e fotos">{{ a.completude }}/6</td>
                 <td class="col-x">{{ a.fonte }}</td>
                 <td class="col-x num">{{ a.data_coleta[8:10] ~ '/' ~ a.data_coleta[5:7] ~ '/' ~ a.data_coleta[0:4] if a.data_coleta|length == 10 else a.data_coleta }}</td>
                 <td class="n col-x">{{ 'Sim' if a.elevador else '–' }}</td>
@@ -577,7 +580,7 @@
     <span class="cnt num" id="fabCnt"></span>
     <button class="btn" type="button" id="fUndo" aria-label="Desfazer">↶</button>
     <button class="btn" type="button" id="fRedo" aria-label="Refazer">↷</button>
-    <button class="btn" type="button" id="fOk">Só válidas</button>
+    <button class="btn" type="button" id="fOk">Sem alertas</button>
     <button class="btn" type="button" id="fCmp">Comparar (0)</button>
     <button class="btn" type="button" id="fCopy">Copiar</button>
     <button class="btn pri" type="button" id="fCsv">CSV numérico</button>
@@ -717,7 +720,7 @@
     if (tab) {
       rows = $$("tr", tbody).map(function (el) { var d = el.dataset;
         var fl = []; try { fl = JSON.parse(d.fotos || "[]"); } catch (e) {}
-        return { fotos: fl, titulo: d.titulo || "", el: el, id: d.id, st: d.st, stl: d.stl, bairro: d.bairro, valor: num(d.valor), area: num(d.area), m2: num(d.m2), q: num(d.q), vagas: num(d.vagas), b: num(d.b), fonte: d.fonte || "", andar: num(d.andar), url: d.url, cb: $("input[type=checkbox]", el) }; });
+        return { fotos: fl, titulo: d.titulo || "", el: el, id: d.id, st: d.st, stl: d.stl, bairro: d.bairro, valor: num(d.valor), area: num(d.area), m2: num(d.m2), q: num(d.q), vagas: num(d.vagas), comp: num(d.comp), mot: (function () { try { return JSON.parse(d.mot || "[]"); } catch (e) { return []; } })(), b: num(d.b), fonte: d.fonte || "", andar: num(d.andar), url: d.url, cb: $("input[type=checkbox]", el) }; });
       rows.forEach(function (r) { $$("td[data-f]", r.el).forEach(function (td) { var k = td.getAttribute("data-f"), v = r[k]; if (v == null) return; var a = td.querySelector("strong") || td; a.textContent = (k === "area" ? nf2 : nf0).format(v); }); });
     }
     /* ---------- Fotos: miniaturas, galeria, curadoria ---------- */
@@ -812,9 +815,10 @@
       else tx = "Amostra pronta. Exporte o CSV numérico quando concluir a curadoria.";
       $("#proximaTx").textContent = tx;
       $("#fab").hidden = !tab; $("#fabCnt").textContent = n + " em uso";
-      $("#k-de").textContent = "de " + rows.length + " coletadas";
+      var fora = rows.filter(function (r) { return r.st === "fora"; }).length, compat = rows.length - fora;
+      $("#k-de").textContent = "de " + compat + " compatíveis com os filtros";
       var dup = rows.filter(function (r) { return r.dup; }).length, inc = rows.filter(function (r) { return r.inc; }).length, fts = {}; rows.forEach(function (r) { fts[r.fonte] = (fts[r.fonte] || 0) + 1; });
-      $("#qline").innerHTML = '<span class="pill">' + (rows.length - n) + (rows.length - n === 1 ? " descartada" : " descartadas") + '</span><span class="pill' + (dup ? " w" : "") + '">' + dup + (dup === 1 ? " possível duplicidade" : " possíveis duplicidades") + '</span><span class="pill' + (inc ? " w" : "") + '">' + inc + (inc === 1 ? " com dado incompleto" : " com dados incompletos") + '</span>' +
+      $("#qline").innerHTML = '<span class="pill">' + rows.length + ' coletados</span><span class="pill' + (fora ? " w" : "") + '">' + fora + ' fora dos filtros</span><span class="pill">' + (compat - n) + (compat - n === 1 ? " não selecionada" : " não selecionadas") + '</span><span class="pill' + (dup ? " w" : "") + '">' + dup + (dup === 1 ? " possível duplicidade" : " possíveis duplicidades") + '</span><span class="pill' + (inc ? " w" : "") + '">' + inc + (inc === 1 ? " com dado incompleto" : " com dados incompletos") + '</span>' +
         Object.keys(fts).map(function (k) { return '<span class="pill">' + esc(k) + ": " + fts[k] + "</span>"; }).join("");
       $("#fCmp").textContent = "Comparar (" + CMP.length + ")";
     }
@@ -824,7 +828,7 @@
     function abrirCmp() { if (CMP.length < 2) return toast("Escolha ao menos 2 imóveis (painel de análise → Comparar)"); var best = Math.min.apply(null, CMP.map(function (r) { return r.m2 == null ? Infinity : r.m2; }));
       var L = [["Fonte", function (r) { return r.fonte || "–"; }], ["Bairro", function (r) { return r.bairro === "NAO_INFORMADO" ? "Não informado" : r.bairro; }], ["Valor", function (r) { return r.valor != null ? "R$ " + nf0.format(r.valor) : "–"; }], ["Área", function (r) { return r.area != null ? nf2.format(r.area) + " m²" : "–"; }],
         ["R$/m²", function (r) { return r.m2 != null ? "R$ " + nf0.format(r.m2) : "–"; }, 1], ["Quartos", function (r) { return r.q != null ? r.q : "–"; }], ["Banheiros", function (r) { return r.b != null ? r.b : "–"; }], ["Vagas", function (r) { return r.vagas != null ? r.vagas : "–"; }],
-        ["Situação", function (r) { return r.st === "ok" ? "Válida" : "Possível outlier"; }], ["Anúncio", function (r) { return r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">Abrir ↗</a>' : "–"; }, 2]];
+        ["Situação", function (r) { return r.st === "fora" ? "Fora dos filtros" : r.st === "ok" ? "Compatível" : "Com alerta"; }], ["Anúncio", function (r) { return r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">Abrir ↗</a>' : "–"; }, 2]];
       $("#cmpB").innerHTML = "<table><thead><tr><th></th>" + CMP.map(function (r, i) { return "<th>Imóvel " + (i + 1) + "</th>"; }).join("") + "</tr></thead><tbody>" + L.map(function (l) { return "<tr><th>" + l[0] + "</th>" + CMP.map(function (r) { var v = l[2] === 2 ? l[1](r) : esc(String(l[1](r))); return "<td" + (l[2] === 1 && r.m2 === best ? ' class="best"' : "") + ">" + v + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table>";
       var d = $("#cmpD"); if (!d.open) d.showModal(); }
     /* ---------- Gráficos (SVG próprio, escalas honestas) ---------- */
@@ -893,9 +897,9 @@
       if (sel) {
         var S2 = stats(u.map(function (r) { return r.m2; }).filter(function (x) { return x != null; })), x = sel.m2, perc = S2 && x != null ? S2.sorted.filter(function (v) { return v <= x; }).length / S2.n * 100 : null;
         h += '<h3>Imóvel selecionado</h3><div class="box"><dl><dt>Bairro</dt><dd>' + esc(sel.bairro === "NAO_INFORMADO" ? "Não informado" : sel.bairro) + "</dd><dt>Valor</dt><dd>" + (sel.valor != null ? "R$ " + nf0.format(sel.valor) : "–") +
-          "</dd><dt>Área</dt><dd>" + (sel.area != null ? nf2.format(sel.area) + " m²" : "–") + "</dd><dt>R$/m²</dt><dd>" + (x != null ? "R$ " + nf0.format(x) : "–") + "</dd><dt>Quartos · Vagas</dt><dd>" + (sel.q != null ? sel.q : "–") + " · " + (sel.vagas != null ? sel.vagas : "–") + "</dd><dt>Status</dt><dd>" + esc(sel.st === "ok" ? "válida" : "possível outlier") + "</dd></dl>";
+          "</dd><dt>Área</dt><dd>" + (sel.area != null ? nf2.format(sel.area) + " m²" : "–") + "</dd><dt>R$/m²</dt><dd>" + (x != null ? "R$ " + nf0.format(x) : "–") + "</dd><dt>Quartos · Vagas</dt><dd>" + (sel.q != null ? sel.q : "–") + " · " + (sel.vagas != null ? sel.vagas : "–") + "</dd><dt>Status</dt><dd>" + esc(sel.st === "fora" ? "fora dos filtros" : sel.st === "ok" ? "compatível" : "com alerta") + "</dd></dl>";
         if (S2 && x != null && S2.n > 1) h += '<p class="note">Posição na amostra em uso: <b>percentil ' + nf0.format(perc) + "</b> · " + (x >= S2.med ? "+" : "") + nf0.format((x / S2.med - 1) * 100) + "% da mediana" + (S2.sd ? " · z = " + nf2.format((x - S2.mean) / S2.sd) : "") + ".</p>";
-        if (sel.st === "alerta") h += '<p class="note">O saneamento marcou este imóvel como possível outlier. Ele não foi excluído da tabela: você decide se entra na amostra.</p>';
+        if (sel.mot && sel.mot.length) h += '<p class="note"><b>Por que o alerta:</b></p><ul class="note" style="margin:2px 0 0;padding-left:18px">' + sel.mot.map(function (m) { return "<li>" + esc(m) + "</li>"; }).join("") + '</ul><p class="note">Nada foi excluído: você decide se este imóvel entra na amostra.</p>';
         h += '<p style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap">' + (sel.url ? '<a class="btn" href="' + esc(sel.url) + '" target="_blank" rel="noopener noreferrer">Abrir anúncio ↗</a>' : "") + '<button class="btn" type="button" id="iUsar">' + (sel.cb.checked ? "Retirar da amostra" : "Usar na amostra") + '</button><button class="btn" type="button" id="iCmp">' + (CMP.indexOf(sel) > -1 ? "Remover da comparação" : "Comparar") + '</button><button class="btn" type="button" id="iFechar">Limpar</button></p></div>';
       }
       h += "<h3>Estatísticas · " + V.nome + '</h3><div class="box">';
@@ -915,7 +919,7 @@
     var ordem = [];
     function filtrar() {
       var q = $("#busca").value.trim().toLowerCase(), st = $("#fStatus").value, vis = 0, ids = bin != null && BINS[bin] ? BINS[bin].ids : null;
-      rows.forEach(function (r) { var ok = (!st || r.st === st) && (!q || r.el.textContent.toLowerCase().indexOf(q) > -1) && (!ids || ids.indexOf(r.id) > -1); r.el.style.display = ok ? "" : "none"; if (ok) vis++; });
+      rows.forEach(function (r) { var ok = (st === "todos" || (!st ? r.st !== "fora" : r.st === st)) && (!q || r.el.textContent.toLowerCase().indexOf(q) > -1) && (!ids || ids.indexOf(r.id) > -1); r.el.style.display = ok ? "" : "none"; if (ok) vis++; });
       $("#vazio").style.display = vis ? "none" : "block"; $("#contagem").textContent = vis + " de " + rows.length; $("#chipBin").classList.toggle("on", bin != null);
     }
     function ordenar() {
@@ -979,8 +983,8 @@
       if (tab) c = c.concat([
         { g: "Navegação", n: "Ir para indicadores e gráficos", k: "graficos distribuicao", f: function () { irPara("#sec-graf"); } },
         { g: "Navegação", n: "Ir para a tabela de curadoria", k: "tabela amostras", f: function () { irPara("#sec-tab"); } },
-        { g: "Amostra", n: "Marcar só amostras válidas", k: "marcar ok", f: function () { marcar(function (r) { return r.st === "ok"; }); } },
-        { g: "Amostra", n: "Marcar todas", k: "todos", f: function () { marcar(function () { return true; }); } },
+        { g: "Amostra", n: "Marcar só compatíveis sem alerta", k: "marcar ok", f: function () { marcar(function (r) { return r.st === "ok"; }); } },
+        { g: "Amostra", n: "Marcar todas as compatíveis", k: "todos", f: function () { marcar(function (r) { return r.st !== "fora"; }); } },
         { g: "Amostra", n: "Limpar seleção (nenhuma em uso)", k: "limpar nenhum", f: function () { marcar(function () { return false; }); } },
         { g: "Amostra", n: "Abrir comparação de imóveis", k: "comparar", f: abrirCmp },
         { g: "Amostra", n: "Desfazer", k: "desfazer undo", s: "Ctrl Z", f: desfazer }, { g: "Amostra", n: "Refazer", k: "refazer redo", s: "Ctrl ⇧ Z", f: refazer },

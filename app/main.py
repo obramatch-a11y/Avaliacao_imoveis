@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from app.exporter import gerar_csv
 from app.models import AmostraMercado, BuscaImovelInput
 from app.normalizer import normalizar_registro_bruto
+from app.qualidade import avaliar
 from app.scrapers.chaves import ChavesNaMaoScraper
 from app.scrapers.olx import OLXScraper
 
@@ -68,11 +69,9 @@ def normalizar_lista(brutos: list[dict], params: BuscaImovelInput) -> list[Amost
             tipo_imovel=params.tipo_imovel,
             finalidade=params.finalidade,
         )
-        v = amostra.valor_oferta
-        if (params.preco_min and (v is None or v < params.preco_min)) or (
-            params.preco_max and (v is None or v > params.preco_max)
-        ):
-            continue
+        amostra.fora_filtros, amostra.motivos, amostra.completude = avaliar(
+            amostra, params, f"{item.get('titulo', '')} {item.get('detalhes', '')}"
+        )
         assinatura = (amostra.bairro.lower(), amostra.area_m2, amostra.valor_oferta, amostra.quartos)
         if assinatura in vistos_assinatura:
             continue

@@ -93,3 +93,16 @@ def test_resultado_parcial_enquanto_coleta_roda(monkeypatch):
         html = c.get(f"/coleta/{jid}/resultado").text
         assert "Coleta em andamento" in html and "Apto A" in html
         c.post(f"/coleta/{jid}/cancelar")
+
+
+def test_filtros_validados_no_backend_exemplos_do_relatorio():
+    from app.main import normalizar_lista
+    from app.models import BuscaImovelInput
+    p = BuscaImovelInput(uf="PE", cidade="Recife", finalidade="VENDA", tipo_imovel="APARTAMENTO",
+                         preco_min=200000, preco_max=600000, area_min=50, area_max=120)
+    casos = [("R$ 2.900", "100"), ("R$ 75.000", "110"), ("R$ 578.000", "30"), ("R$ 1.600.000", "99"), ("R$ 2.400.000", "378"), ("R$ 450.000", "80")]
+    brutos = [{"fonte": "OLX", "titulo": f"Apto {i}", "preco": pr, "area": ar, "quartos": "2", "bairro": "Boa Viagem", "url": f"https://x/{i}"} for i, (pr, ar) in enumerate(casos)]
+    r = normalizar_lista(brutos, p)
+    assert [a.fora_filtros for a in r] == [True, True, True, True, True, False]
+    assert any("Área abaixo" in m for m in r[2].motivos) and any("Valor baixo demais" in m for m in r[0].motivos)
+    assert r[5].motivos == [] and r[5].completude == 4
