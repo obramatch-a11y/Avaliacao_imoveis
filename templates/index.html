@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 rx=%276%27 fill=%27%230b4a57%27/%3E%3Cpath d=%27M3 18c3 0 3-12 6-12s3 12 6 12 3-7 6-7%27 fill=%27none%27 stroke=%27%235eead4%27 stroke-width=%272%27 stroke-linecap=%27round%27/%3E%3C/svg%3E" />
   <meta name="description" content="Inferência Estatística — Inteligência de dados aplicada à avaliação imobiliária." />
   <title>Inferência Estatística — Inteligência de dados aplicada à avaliação imobiliária</title>
   <script>
@@ -36,7 +37,7 @@
 
       --bg: #edf1f0; --bg-glow: radial-gradient(1100px 520px at 12% -10%, rgba(20,184,166,.10), transparent 60%), radial-gradient(900px 480px at 100% 0%, rgba(11,74,87,.08), transparent 55%);
       --surface: #ffffff; --surface-2: #f4f7f6; --surface-3: #e7edeb; --line: #d9e1de; --line-2: #c5d0cc;
-      --text: #10201f; --muted: #50625f; --faint: #7b8c88;
+      --text: #10201f; --muted: #50625f; --faint: #5d6f6b;
       --accent: #0b7c72; --accent-2: #0f9d8f; --accent-ink: #ffffff; --accent-soft: #d8f1ee;
       --petrol: #062a33; --petrol-2: #0b4a57;
       --ok: #0a7a4f; --ok-bg: #d6f3e5; --warn: #8a4b06; --warn-bg: #fbe9c6; --bad: #a3261e;
@@ -47,7 +48,7 @@
     [data-theme="dark"] {
       --bg: #061a1f; --bg-glow: radial-gradient(1100px 520px at 12% -10%, rgba(45,212,191,.10), transparent 60%), radial-gradient(900px 480px at 100% 0%, rgba(34,211,238,.06), transparent 55%);
       --surface: #0c2429; --surface-2: #0f2b31; --surface-3: #163940; --line: #1f434b; --line-2: #2b5660;
-      --text: #e6f2f0; --muted: #9bb5b1; --faint: #6f8d89;
+      --text: #e6f2f0; --muted: #9bb5b1; --faint: #8aa6a2;
       --accent: #2dd4bf; --accent-2: #5eead4; --accent-ink: #04201d; --accent-soft: #0f3a3b;
       --petrol: #031318; --petrol-2: #0b2f38;
       --ok: #6ee7b7; --ok-bg: #0f3a2c; --warn: #fcd34d; --warn-bg: #3d2e0b; --bad: #fca5a5;
@@ -206,6 +207,17 @@
     input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
     .vazio { display: none; padding: 26px; text-align: center; color: var(--muted); }
 
+    .qline { display: flex; gap: 8px; flex-wrap: wrap; margin-top: -6px; }
+    .qline .pill { background: var(--surface); border: 1px solid var(--line); font-size: 12px; }
+    .qline .pill.w { border-color: var(--warn); color: var(--warn); }
+    .mini { font-size: 10.5px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: var(--surface-3); color: var(--muted); white-space: nowrap; }
+    .mini.w { background: var(--warn-bg); color: var(--warn); }
+    dialog.cmp { border: 1px solid var(--line); border-radius: var(--r-l); padding: 0; width: min(900px, calc(100vw - 16px)); max-height: 86vh; background: var(--surface); color: var(--text); box-shadow: var(--shadow-2); }
+    dialog.cmp::backdrop { background: rgba(3,19,24,.5); }
+    .cmp .hd2 { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    .cmp .cw { overflow: auto; max-height: calc(86vh - 60px); }
+    .cmp table th, .cmp table td { position: static; padding: 8px 12px; height: auto; text-transform: none; font-size: 13px; letter-spacing: 0; white-space: normal; vertical-align: top; }
+    .cmp td.best { background: var(--ok-bg); color: var(--ok); font-weight: 700; }
     /* Progresso da coleta */
     .prog { display: none; padding: 16px; gap: 10px; }
     .prog.on { display: grid; }
@@ -213,12 +225,13 @@
     .prog ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; color: var(--muted); font-size: 12.5px; }
     .prog .err { color: var(--bad); }
     /* Fotos */
-    .th { position: relative; display: block; width: 72px; height: 54px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; background: var(--surface-3); cursor: zoom-in; }
+    .th { position: relative; display: block; width: var(--thw, 96px); height: var(--thh, 72px); padding: 0; border: 0; border-radius: 8px; overflow: hidden; background: var(--surface-3); cursor: zoom-in; }
     .th img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity var(--t-mid); }
     .th img.ok { opacity: 1; }
     .th .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); }
     .th .cn { position: absolute; right: 3px; bottom: 3px; background: rgba(3,19,24,.72); color: #fff; font-size: 10.5px; padding: 0 5px; border-radius: 6px; line-height: 16px; }
-    td.ft { width: 88px; }
+    td.ft { width: 112px; }
+    [data-density="compact"] { --thw: 72px; --thh: 54px; }
     .vw { display: inline-flex; border: 1px solid var(--line-2); border-radius: 9px; overflow: hidden; }
     .vw button { height: 32px; padding: 0 12px; border: 0; background: var(--surface); cursor: pointer; font-size: 12.5px; color: var(--muted); }
     .vw button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); font-weight: 600; }
@@ -438,6 +451,8 @@
         <div class="kpi"><span data-tip="Mínimo de dados da NBR 14653-2 (Grau I ≥ 5, II ≥ 10, III ≥ 15). Confira também a relação com o nº de variáveis do modelo." tabindex="0">Mínimo amostral</span><strong id="k-grau" style="font-size:16px;line-height:1.5">–</strong><em>NBR 14653-2</em></div>
       </section>
 
+      <div class="qline" id="qline" aria-live="polite"></div>
+
       <section class="charts" id="sec-graf" aria-label="Distribuição e dispersão">
         <div class="card">
           <div class="card-h"><h2>Distribuição</h2>
@@ -453,6 +468,11 @@
           <div class="card-b" style="padding-bottom:4px"><svg class="chart" id="disp" viewBox="0 0 640 270" role="img" aria-label="Gráfico de dispersão entre área e valor por metro quadrado"></svg></div>
           <div class="legend"><span><i style="background:var(--pt-on)"></i>Em uso</span><span><i style="background:var(--pt-off)"></i>Fora da amostra</span><span><i style="background:var(--pt-out)"></i>Possível outlier</span></div>
         </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-h"><h2>Boxplot de R$/m²</h2><small id="boxInfo">caixa = 50% central · traço = mediana · pontos = valores atípicos</small><span class="grow"></span>
+            <button class="ib" type="button" id="expBox" aria-label="Baixar boxplot em PNG" title="Baixar PNG">PNG</button></div>
+          <div class="card-b" style="padding-bottom:10px"><svg class="chart" id="boxp" viewBox="0 0 640 120" role="img" aria-label="Boxplot do valor por metro quadrado"></svg></div>
+        </div>
       </section>
 
       <section class="card" id="sec-tab" aria-labelledby="t-cur">
@@ -466,7 +486,7 @@
         <div class="tools">
           <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
             <input id="busca" type="search" placeholder="Buscar na tabela ( / )" aria-label="Buscar na tabela" /></div>
-          <select id="fStatus" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="ok">Somente OK</option><option value="alerta">Somente alertas</option></select>
+          <select id="fStatus" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="ok">Somente válidas</option><option value="alerta">Somente alertas</option></select>
           <span class="chipf" id="chipBin" role="button" tabindex="0" aria-label="Limpar filtro do gráfico">Faixa do gráfico ✕</span>
           <span class="grow"></span><span class="muted num" id="contagem"></span>
           <span class="vw" role="group" aria-label="Modo de visualização"><button type="button" id="vTab" aria-pressed="true">Tabela</button><button type="button" id="vGal" aria-pressed="false">Galeria</button></span>
@@ -475,35 +495,38 @@
           <table id="tab">
             <thead><tr>
               <th style="width:54px">Usar</th>
-              <th style="width:88px">Foto</th>
+              <th style="width:112px">Foto</th>
               <th class="s" data-k="st" data-t="txt">Status<span class="ar"></span></th>
               <th class="s" data-k="bairro" data-t="txt">Bairro<span class="ar"></span></th>
               <th class="s n" data-k="valor" data-t="num">Valor (R$)<span class="ar"></span></th>
               <th class="s n" data-k="area" data-t="num">Área (m²)<span class="ar"></span></th>
               <th class="s n" data-k="m2" data-t="num">R$/m²<span class="ar"></span></th>
               <th class="s n" data-k="q" data-t="num">Qts<span class="ar"></span></th>
+              <th class="s n" data-k="b" data-t="num">Banh.<span class="ar"></span></th>
               <th class="s n" data-k="vagas" data-t="num">Vagas<span class="ar"></span></th>
               <th class="s n col-x" data-k="andar" data-t="num">Andar<span class="ar"></span></th>
-              <th class="col-x">Fonte</th><th class="n col-x">Elev.</th><th class="n col-x">Pisc.</th><th>Link</th>
+              <th class="col-x">Fonte</th><th class="col-x">Coleta</th><th class="n col-x">Elev.</th><th class="n col-x">Pisc.</th><th>Link</th>
             </tr></thead>
             <tbody>
               {% for a in amostras %}
               <tr class="{% if a.alerta_saneamento != 'OK' %}alerta{% endif %}" tabindex="-1"
                   data-id="{{ a.id_amostra }}" data-st="{{ 'ok' if a.alerta_saneamento == 'OK' else 'alerta' }}" data-stl="{{ a.alerta_saneamento }}"
                   data-bairro="{{ a.bairro }}" data-valor="{{ a.valor_oferta if a.valor_oferta is not none else '' }}" data-area="{{ a.area_m2 if a.area_m2 is not none else '' }}"
-                  data-m2="{{ a.valor_m2 if a.valor_m2 is not none else '' }}" data-q="{{ a.quartos if a.quartos is not none else '' }}" data-vagas="{{ a.vagas }}"
+                  data-m2="{{ a.valor_m2 if a.valor_m2 is not none else '' }}" data-q="{{ a.quartos if a.quartos is not none else '' }}" data-vagas="{{ a.vagas }}" data-b="{{ a.banheiros if a.banheiros is not none else '' }}" data-fonte="{{ a.fonte }}"
                   data-andar="{{ a.andar if a.andar is not none else '' }}" data-url="{{ a.url_anuncio or '' }}" data-titulo="{{ a.titulo_anuncio }}" data-fotos='{{ a.fotos|tojson }}'>
                 <td><input type="checkbox" form="formExport" name="ids_selecionados" value="{{ a.id_amostra }}" aria-label="Usar amostra {{ a.id_amostra }}" {% if a.alerta_saneamento == 'OK' %}checked{% endif %}></td>
                 <td class="ft"></td>
-                <td>{% if a.alerta_saneamento == 'OK' %}<span class="tag ok">OK</span>{% else %}<span class="tag warn">{{ a.alerta_saneamento|replace('_', ' ')|capitalize }}</span>{% endif %}</td>
+                <td>{% if a.alerta_saneamento == 'OK' %}<span class="tag ok">Válida</span>{% else %}<span class="tag warn">{{ 'Possível outlier' if a.alerta_saneamento == 'POSSIVEL_OUTLIER' else (a.alerta_saneamento|replace('_', ' ')|capitalize) }}</span>{% endif %}</td>
                 <td>{% if a.bairro == 'NAO_INFORMADO' %}<span class="muted">Não informado</span>{% else %}{{ a.bairro }}{% endif %}</td>
                 <td class="n" data-f="valor"><strong>{{ a.valor_oferta or '–' }}</strong></td>
                 <td class="n" data-f="area">{{ a.area_m2 or '–' }}</td>
                 <td class="n" data-f="m2">{{ a.valor_m2 or '–' }}</td>
                 <td class="n">{{ a.quartos if a.quartos is not none else '–' }}</td>
+                <td class="n">{{ a.banheiros if a.banheiros is not none else '–' }}</td>
                 <td class="n">{{ a.vagas }}</td>
                 <td class="n col-x">{{ a.andar if a.andar is not none else '–' }}</td>
                 <td class="col-x">{{ a.fonte }}</td>
+                <td class="col-x num">{{ a.data_coleta[8:10] ~ '/' ~ a.data_coleta[5:7] ~ '/' ~ a.data_coleta[0:4] if a.data_coleta|length == 10 else a.data_coleta }}</td>
                 <td class="n col-x">{{ 'Sim' if a.elevador else '–' }}</td>
                 <td class="n col-x">{{ 'Sim' if a.piscina else '–' }}</td>
                 <td>{% if a.url_anuncio %}<a href="{{ a.url_anuncio }}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>{% endif %}</td>
@@ -546,7 +569,8 @@
     <span class="cnt num" id="fabCnt"></span>
     <button class="btn" type="button" id="fUndo" aria-label="Desfazer">↶</button>
     <button class="btn" type="button" id="fRedo" aria-label="Refazer">↷</button>
-    <button class="btn" type="button" id="fOk">Só OK</button>
+    <button class="btn" type="button" id="fOk">Só válidas</button>
+    <button class="btn" type="button" id="fCmp">Comparar (0)</button>
     <button class="btn" type="button" id="fCopy">Copiar</button>
     <button class="btn pri" type="button" id="fCsv">CSV numérico</button>
   </div>
@@ -555,6 +579,10 @@
     <input id="palQ" type="text" placeholder="Digite um comando, bairro ou busca recente…" aria-label="Pesquisar comandos" autocomplete="off" />
     <ul id="palL" role="listbox"></ul>
     <div class="foot"><span><kbd>↑</kbd><kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> executar</span><span><kbd>Esc</kbd> fechar</span></div>
+  </dialog>
+  <dialog class="cmp" id="cmpD" aria-label="Comparação de imóveis">
+    <div class="hd2"><strong>Comparar imóveis</strong><span class="grow"></span><button class="btn" type="button" id="cmpL">Limpar comparação</button><button class="ib" type="button" id="cmpX" aria-label="Fechar">✕</button></div>
+    <div class="cw" id="cmpB"></div>
   </dialog>
   <dialog class="lb" id="lb" aria-label="Galeria de fotos">
     <div class="hd"><span class="t" id="lbT"></span><span class="num" id="lbC"></span>
@@ -601,7 +629,7 @@
     function painel(lado) { prefs[lado] = prefs[lado] === false; savePrefs(); vt(aplicar); }
     function foco() { var on = root.getAttribute("data-focus") === "on"; vt(function () { on ? root.removeAttribute("data-focus") : root.setAttribute("data-focus", "on"); }); toast(on ? "Modo foco desligado" : "Modo foco ligado (F para sair)"); }
     var tab = $("#tab"), rows = [], tbody = tab ? $("tbody", tab) : null, sel = null, bin = null, varAtual = "m2", BINS = [];
-    function desenhar() { if (tab) { histograma(); dispersao(); } }
+    function desenhar() { if (tab) { histograma(); dispersao(); boxplot(); } }
     aplicar();
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if ((prefs.tema || "auto") === "auto") { aplicar(); desenhar(); } });
     addEventListener("resize", function () { $("#bEsq").style.display = innerWidth > 1180 ? "" : "none"; });
@@ -655,7 +683,7 @@
     function poll() { fetch("/coleta/" + jobId).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
       if (!x.ok) return falha(x.j.erro || "Coleta não encontrada."); var j = x.j, pct = Math.max(4, Math.min(100, (j.pagina / j.paginas) * 100));
       $("#progB").style.width = pct + "%"; $("#progT").textContent = j.estado === "rodando" ? "Coletando ofertas…" : "Finalizando…";
-      $("#progD").textContent = "Página " + Math.min(j.pagina + 1, j.paginas) + " de " + j.paginas + " · " + j.encontrados + " imóveis encontrados · " + j.segundos + "s";
+      $("#progD").textContent = "Página " + Math.min(j.pagina + 1, j.paginas) + " de " + j.paginas + " · " + j.encontrados + " imóveis encontrados · " + j.fontes + " fonte(s) · " + j.segundos + "s";
       $("#progL").innerHTML = j.previa.map(function (p) { return "<li>" + esc(p.titulo) + (p.preco ? " — " + esc(p.preco) : "") + "</li>"; }).join("");
       $("#proximaTx").textContent = j.encontrados + " imóveis até agora. Você pode interromper a qualquer momento.";
       if (j.estado === "erro") return falha(j.erro);
@@ -679,7 +707,7 @@
     if (tab) {
       rows = $$("tr", tbody).map(function (el) { var d = el.dataset;
         var fl = []; try { fl = JSON.parse(d.fotos || "[]"); } catch (e) {}
-        return { fotos: fl, titulo: d.titulo || "", el: el, id: d.id, st: d.st, stl: d.stl, bairro: d.bairro, valor: num(d.valor), area: num(d.area), m2: num(d.m2), q: num(d.q), vagas: num(d.vagas), andar: num(d.andar), url: d.url, cb: $("input[type=checkbox]", el) }; });
+        return { fotos: fl, titulo: d.titulo || "", el: el, id: d.id, st: d.st, stl: d.stl, bairro: d.bairro, valor: num(d.valor), area: num(d.area), m2: num(d.m2), q: num(d.q), vagas: num(d.vagas), b: num(d.b), fonte: d.fonte || "", andar: num(d.andar), url: d.url, cb: $("input[type=checkbox]", el) }; });
       rows.forEach(function (r) { $$("td[data-f]", r.el).forEach(function (td) { var k = td.getAttribute("data-f"), v = r[k]; if (v == null) return; var a = td.querySelector("strong") || td; a.textContent = (k === "area" ? nf2 : nf0).format(v); }); });
     }
     /* ---------- Fotos: miniaturas, galeria, curadoria ---------- */
@@ -736,6 +764,13 @@
         $("input", f).addEventListener("change", function () { empilhar(); r.cb.checked = this.checked; atualizar(); }); c.appendChild(f); g.appendChild(c); }); }
     function modo(v) { root.setAttribute("data-view", v); $("#vTab").setAttribute("aria-pressed", v === "tabela"); $("#vGal").setAttribute("aria-pressed", v === "galeria"); prefs.vista = v; savePrefs(); if (v === "galeria") desenharGaleria(); }
 
+    /* Indicadores por imóvel: informação incompleta e possível duplicidade (apenas sinalizam; nada é descartado) */
+    rows.forEach(function (r) { r.inc = r.area == null || r.valor == null || r.q == null || r.bairro === "NAO_INFORMADO"; r.dup = false; });
+    for (var i1 = 0; i1 < rows.length; i1++) for (var i2 = i1 + 1; i2 < rows.length; i2++) { var A = rows[i1], B = rows[i2];
+      if (A.area != null && B.area != null && A.valor != null && B.valor != null && Math.abs(A.area - B.area) / A.area <= .01 && Math.abs(A.valor - B.valor) / A.valor <= .02 && A.fonte !== B.fonte) { A.dup = B.dup = true; } }
+    rows.forEach(function (r) { var c = $("td:nth-child(3)", r.el); if (!c) return; if (r.dup) c.insertAdjacentHTML("beforeend", '<span class="mini w" title="Outro anúncio de outra fonte tem área e valor muito parecidos. Confira se é o mesmo imóvel.">duplicidade?</span>');
+      if (r.inc) c.insertAdjacentHTML("beforeend", '<span class="mini" title="Faltam dados (área, valor, quartos ou bairro).">incompleto</span>'); });
+
     /* Estatística descritiva (determinística; quantis por interpolação linear — tipo 7) */
     function quant(s, p) { var h = (s.length - 1) * p, lo = Math.floor(h), hi = Math.ceil(h); return s[lo] + (s[hi] - s[lo]) * (h - lo); }
     function stats(v) { var n = v.length; if (!n) return null; var s = v.slice().sort(function (a, b) { return a - b; }), m = v.reduce(function (a, b) { return a + b; }, 0) / n;
@@ -767,8 +802,21 @@
       else tx = "Amostra pronta. Exporte o CSV numérico quando concluir a curadoria.";
       $("#proximaTx").textContent = tx;
       $("#fab").hidden = !tab; $("#fabCnt").textContent = n + " em uso";
+      $("#k-de").textContent = "de " + rows.length + " coletadas";
+      var dup = rows.filter(function (r) { return r.dup; }).length, inc = rows.filter(function (r) { return r.inc; }).length, fts = {}; rows.forEach(function (r) { fts[r.fonte] = (fts[r.fonte] || 0) + 1; });
+      $("#qline").innerHTML = '<span class="pill">' + (rows.length - n) + (rows.length - n === 1 ? " descartada" : " descartadas") + '</span><span class="pill' + (dup ? " w" : "") + '">' + dup + (dup === 1 ? " possível duplicidade" : " possíveis duplicidades") + '</span><span class="pill' + (inc ? " w" : "") + '">' + inc + (inc === 1 ? " com dado incompleto" : " com dados incompletos") + '</span>' +
+        Object.keys(fts).map(function (k) { return '<span class="pill">' + esc(k) + ": " + fts[k] + "</span>"; }).join("");
+      $("#fCmp").textContent = "Comparar (" + CMP.length + ")";
     }
 
+    var CMP = [];
+    function alternaCmp(r) { var i = CMP.indexOf(r); if (i > -1) CMP.splice(i, 1); else if (CMP.length >= 4) return toast("Compare até 4 imóveis por vez"); else CMP.push(r); $("#fCmp").textContent = "Comparar (" + CMP.length + ")"; inspetor(); }
+    function abrirCmp() { if (CMP.length < 2) return toast("Escolha ao menos 2 imóveis (painel de análise → Comparar)"); var best = Math.min.apply(null, CMP.map(function (r) { return r.m2 == null ? Infinity : r.m2; }));
+      var L = [["Fonte", function (r) { return r.fonte || "–"; }], ["Bairro", function (r) { return r.bairro === "NAO_INFORMADO" ? "Não informado" : r.bairro; }], ["Valor", function (r) { return r.valor != null ? "R$ " + nf0.format(r.valor) : "–"; }], ["Área", function (r) { return r.area != null ? nf2.format(r.area) + " m²" : "–"; }],
+        ["R$/m²", function (r) { return r.m2 != null ? "R$ " + nf0.format(r.m2) : "–"; }, 1], ["Quartos", function (r) { return r.q != null ? r.q : "–"; }], ["Banheiros", function (r) { return r.b != null ? r.b : "–"; }], ["Vagas", function (r) { return r.vagas != null ? r.vagas : "–"; }],
+        ["Situação", function (r) { return r.st === "ok" ? "Válida" : "Possível outlier"; }], ["Anúncio", function (r) { return r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">Abrir ↗</a>' : "–"; }, 2]];
+      $("#cmpB").innerHTML = "<table><thead><tr><th></th>" + CMP.map(function (r, i) { return "<th>Imóvel " + (i + 1) + "</th>"; }).join("") + "</tr></thead><tbody>" + L.map(function (l) { return "<tr><th>" + l[0] + "</th>" + CMP.map(function (r) { var v = l[2] === 2 ? l[1](r) : esc(String(l[1](r))); return "<td" + (l[2] === 1 && r.m2 === best ? ' class="best"' : "") + ">" + v + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table>";
+      var d = $("#cmpD"); if (!d.open) d.showModal(); }
     /* ---------- Gráficos (SVG próprio, escalas honestas) ---------- */
     function cor(n) { return getComputedStyle(root).getPropertyValue(n).trim(); }
     function nice(lo, hi, k) { var span = hi - lo || 1, st = Math.pow(10, Math.floor(Math.log10(span / k))), e = span / k / st, m = e < 1.5 ? 1 : e < 3 ? 2 : e < 7 ? 5 : 10; st *= m;
@@ -791,6 +839,20 @@
       out += '<text x="' + (L + pw / 2) + '" y="' + (H - 4) + '" text-anchor="middle" fill="' + c.tx + '">' + V.nome + '  (linha verde = mediana)</text><text x="12" y="' + (T + ph / 2) + '" transform="rotate(-90 12 ' + (T + ph / 2) + ')" text-anchor="middle" fill="' + c.tx + '">nº de amostras</text>';
       svg.innerHTML = out; $("#histInfo").textContent = k + " classes (Sturges) · n = " + S.n;
     }
+    function boxplot() {
+      var svg = $("#boxp"); if (!svg) return; var u = emUso().filter(function (r) { return r.m2 != null; }), c = { on: cor("--pt-on"), out: cor("--pt-out"), sel: cor("--pt-sel"), gl: cor("--line"), tx: cor("--muted") }, G = [["Todas", u]], fs = {};
+      u.forEach(function (r) { (fs[r.fonte] = fs[r.fonte] || []).push(r); }); if (Object.keys(fs).length > 1) Object.keys(fs).forEach(function (k) { G.push([k, fs[k]]); });
+      var W = 640, L = 132, R = 16, T = 8, rowH = 38, H = T + G.length * rowH + 30; svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      if (u.length < 4) { svg.innerHTML = '<text x="' + W / 2 + '" y="50" text-anchor="middle">Selecione ao menos 4 amostras para o boxplot</text>'; return; }
+      var all = u.map(function (r) { return r.m2; }), xt = nice(Math.min.apply(null, all), Math.max.apply(null, all), 6), pw = W - L - R, X = function (v) { return L + (v - xt.a) / (xt.b - xt.a || 1) * pw; }, out = "";
+      xt.t.forEach(function (t) { out += '<line class="gl" x1="' + X(t) + '" x2="' + X(t) + '" y1="' + T + '" y2="' + (H - 24) + '" stroke="' + c.gl + '"/><text x="' + X(t) + '" y="' + (H - 8) + '" text-anchor="middle" fill="' + c.tx + '">' + nf0.format(t) + "</text>"; });
+      G.forEach(function (g, i) { var v = g[1].map(function (r) { return r.m2; }), S = stats(v), y = T + i * rowH + rowH / 2; if (!S || S.n < 4) { out += '<text x="' + (L - 8) + '" y="' + (y + 4) + '" text-anchor="end" fill="' + c.tx + '">' + esc(g[0]) + " (n&lt;4)</text>"; return; }
+        var iqr = S.q3 - S.q1, lo = S.sorted.filter(function (x) { return x >= S.q1 - 1.5 * iqr; })[0], hi = S.sorted.filter(function (x) { return x <= S.q3 + 1.5 * iqr; }).pop();
+        out += '<text x="' + (L - 8) + '" y="' + (y + 4) + '" text-anchor="end" fill="' + c.tx + '">' + esc(g[0]) + " (" + S.n + ")</text>" +
+          '<line x1="' + X(lo) + '" x2="' + X(hi) + '" y1="' + y + '" y2="' + y + '" stroke="' + c.tx + '"/><line x1="' + X(lo) + '" x2="' + X(lo) + '" y1="' + (y - 6) + '" y2="' + (y + 6) + '" stroke="' + c.tx + '"/><line x1="' + X(hi) + '" x2="' + X(hi) + '" y1="' + (y - 6) + '" y2="' + (y + 6) + '" stroke="' + c.tx + '"/>' +
+          '<rect x="' + X(S.q1) + '" y="' + (y - 11) + '" width="' + Math.max(1, X(S.q3) - X(S.q1)) + '" height="22" rx="4" fill="' + c.on + '" fill-opacity=".28" stroke="' + c.on + '"><title>Q1 ' + nf0.format(S.q1) + " · mediana " + nf0.format(S.med) + " · Q3 " + nf0.format(S.q3) + '</title></rect><line x1="' + X(S.med) + '" x2="' + X(S.med) + '" y1="' + (y - 11) + '" y2="' + (y + 11) + '" stroke="' + c.sel + '" stroke-width="2.5"/>';
+        S.sorted.forEach(function (x) { if (x < lo || x > hi) out += '<circle cx="' + X(x) + '" cy="' + y + '" r="3.5" fill="' + c.out + '"><title>R$ ' + nf0.format(x) + "/m²</title></circle>"; }); });
+      svg.innerHTML = out; }
     function dispersao() {
       var svg = $("#disp"); if (!svg) return; var pts = rows.filter(function (r) { return r.area != null && r.m2 != null; });
       var W = 640, H = 270, L = 66, R = 14, T = 14, B = 40, c = { on: cor("--pt-on"), off: cor("--pt-off"), out: cor("--pt-out"), sel: cor("--pt-sel"), gl: cor("--line"), tx: cor("--muted") }, out = "";
@@ -821,10 +883,10 @@
       if (sel) {
         var S2 = stats(u.map(function (r) { return r.m2; }).filter(function (x) { return x != null; })), x = sel.m2, perc = S2 && x != null ? S2.sorted.filter(function (v) { return v <= x; }).length / S2.n * 100 : null;
         h += '<h3>Imóvel selecionado</h3><div class="box"><dl><dt>Bairro</dt><dd>' + esc(sel.bairro === "NAO_INFORMADO" ? "Não informado" : sel.bairro) + "</dd><dt>Valor</dt><dd>" + (sel.valor != null ? "R$ " + nf0.format(sel.valor) : "–") +
-          "</dd><dt>Área</dt><dd>" + (sel.area != null ? nf2.format(sel.area) + " m²" : "–") + "</dd><dt>R$/m²</dt><dd>" + (x != null ? "R$ " + nf0.format(x) : "–") + "</dd><dt>Quartos · Vagas</dt><dd>" + (sel.q != null ? sel.q : "–") + " · " + (sel.vagas != null ? sel.vagas : "–") + "</dd><dt>Status</dt><dd>" + esc(sel.stl.replace(/_/g, " ").toLowerCase()) + "</dd></dl>";
+          "</dd><dt>Área</dt><dd>" + (sel.area != null ? nf2.format(sel.area) + " m²" : "–") + "</dd><dt>R$/m²</dt><dd>" + (x != null ? "R$ " + nf0.format(x) : "–") + "</dd><dt>Quartos · Vagas</dt><dd>" + (sel.q != null ? sel.q : "–") + " · " + (sel.vagas != null ? sel.vagas : "–") + "</dd><dt>Status</dt><dd>" + esc(sel.st === "ok" ? "válida" : "possível outlier") + "</dd></dl>";
         if (S2 && x != null && S2.n > 1) h += '<p class="note">Posição na amostra em uso: <b>percentil ' + nf0.format(perc) + "</b> · " + (x >= S2.med ? "+" : "") + nf0.format((x / S2.med - 1) * 100) + "% da mediana" + (S2.sd ? " · z = " + nf2.format((x - S2.mean) / S2.sd) : "") + ".</p>";
         if (sel.st === "alerta") h += '<p class="note">O saneamento marcou este imóvel como possível outlier. Ele não foi excluído da tabela: você decide se entra na amostra.</p>';
-        h += '<p style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap">' + (sel.url ? '<a class="btn" href="' + esc(sel.url) + '" target="_blank" rel="noopener noreferrer">Abrir anúncio ↗</a>' : "") + '<button class="btn" type="button" id="iUsar">' + (sel.cb.checked ? "Retirar da amostra" : "Usar na amostra") + '</button><button class="btn" type="button" id="iFechar">Limpar</button></p></div>';
+        h += '<p style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap">' + (sel.url ? '<a class="btn" href="' + esc(sel.url) + '" target="_blank" rel="noopener noreferrer">Abrir anúncio ↗</a>' : "") + '<button class="btn" type="button" id="iUsar">' + (sel.cb.checked ? "Retirar da amostra" : "Usar na amostra") + '</button><button class="btn" type="button" id="iCmp">' + (CMP.indexOf(sel) > -1 ? "Remover da comparação" : "Comparar") + '</button><button class="btn" type="button" id="iFechar">Limpar</button></p></div>';
       }
       h += "<h3>Estatísticas · " + V.nome + '</h3><div class="box">';
       if (S) { h += "<dl><dt>n</dt><dd>" + S.n + "</dd><dt>Mínimo</dt><dd>" + V.f.format(S.min) + "</dd><dt>1º quartil</dt><dd>" + V.f.format(S.q1) + "</dd><dt>Mediana</dt><dd>" + V.f.format(S.med) + "</dd><dt>3º quartil</dt><dd>" + V.f.format(S.q3) + "</dd><dt>Máximo</dt><dd>" + V.f.format(S.max) +
@@ -833,8 +895,8 @@
       else h += '<p class="note" style="margin:0">Nenhuma amostra em uso.</p>';
       h += '</div><h3>Qualidade dos dados</h3><div class="box">' + linhaQ("Valor informado", rows.filter(function (r) { return r.valor != null; }).length, rows.length) + linhaQ("Área informada", rows.filter(function (r) { return r.area != null; }).length, rows.length) +
         linhaQ("Quartos informados", rows.filter(function (r) { return r.q != null; }).length, rows.length) + linhaQ("Bairro identificado", rows.filter(function (r) { return r.bairro !== "NAO_INFORMADO"; }).length, rows.length) +
-        linhaQ("Sem alerta de saneamento", rows.filter(function (r) { return r.st === "ok"; }).length, rows.length) + '<p class="note g">Campos vazios reduzem o que pode ser usado depois na modelagem. O andar não aparece nos cartões do portal.</p></div>';
-      el.innerHTML = h; var u1 = $("#iUsar"), u2 = $("#iFechar");
+        linhaQ("Sem alerta de outlier", rows.filter(function (r) { return r.st === "ok"; }).length, rows.length) + '<p class="note g">Campos vazios reduzem o que pode ser usado depois na modelagem. O andar não aparece nos cartões do portal.</p></div>';
+      el.innerHTML = h; var u1 = $("#iUsar"), u2 = $("#iFechar"), u3 = $("#iCmp"); if (u3) u3.addEventListener("click", function () { alternaCmp(sel); });
       if (u1) u1.addEventListener("click", function () { empilhar(); sel.cb.checked = !sel.cb.checked; atualizar(); });
       if (u2) u2.addEventListener("click", function () { selecionar(null); });
     }
@@ -881,6 +943,8 @@
       $("#bInsp").addEventListener("click", function () { root.getAttribute("data-sheet") === "open" ? root.removeAttribute("data-sheet") : root.setAttribute("data-sheet", "open"); });
       $("#insp").addEventListener("click", function (e) { if (e.target.id === "iFechar") root.removeAttribute("data-sheet"); });
       $("#expHist").addEventListener("click", function () { exportarPng($("#hist"), "distribuicao_" + varAtual + ".png", "Distribuição de " + VARS[varAtual].nome); toast("Gráfico exportado (alta resolução)"); });
+      $("#expBox").addEventListener("click", function () { exportarPng($("#boxp"), "boxplot_m2.png", "Boxplot de R$/m²"); toast("Gráfico exportado (alta resolução)"); });
+      $("#fCmp").addEventListener("click", abrirCmp); $("#cmpX").addEventListener("click", function () { $("#cmpD").close(); }); $("#cmpL").addEventListener("click", function () { CMP = []; $("#fCmp").textContent = "Comparar (0)"; $("#cmpD").close(); inspetor(); });
       $("#expDisp").addEventListener("click", function () { exportarPng($("#disp"), "dispersao_area_m2.png", "Área × R$/m²"); toast("Gráfico exportado (alta resolução)"); });
       $("#varSel").addEventListener("change", function () { varAtual = this.value; bin = null; filtrar(); desenhar(); inspetor(); });
       $("#hist").addEventListener("click", function (e) { var b = e.target.closest(".bar"); if (!b) return; var i = +b.getAttribute("data-b"); bin = bin === i ? null : i; filtrar(); desenhar(); });
@@ -905,9 +969,10 @@
       if (tab) c = c.concat([
         { g: "Navegação", n: "Ir para indicadores e gráficos", k: "graficos distribuicao", f: function () { irPara("#sec-graf"); } },
         { g: "Navegação", n: "Ir para a tabela de curadoria", k: "tabela amostras", f: function () { irPara("#sec-tab"); } },
-        { g: "Amostra", n: "Marcar só amostras OK", k: "marcar ok", f: function () { marcar(function (r) { return r.st === "ok"; }); } },
+        { g: "Amostra", n: "Marcar só amostras válidas", k: "marcar ok", f: function () { marcar(function (r) { return r.st === "ok"; }); } },
         { g: "Amostra", n: "Marcar todas", k: "todos", f: function () { marcar(function () { return true; }); } },
         { g: "Amostra", n: "Limpar seleção (nenhuma em uso)", k: "limpar nenhum", f: function () { marcar(function () { return false; }); } },
+        { g: "Amostra", n: "Abrir comparação de imóveis", k: "comparar", f: abrirCmp },
         { g: "Amostra", n: "Desfazer", k: "desfazer undo", s: "Ctrl Z", f: desfazer }, { g: "Amostra", n: "Refazer", k: "refazer redo", s: "Ctrl ⇧ Z", f: refazer },
         { g: "Amostra", n: "Copiar amostras em uso (planilha)", k: "copiar clipboard", f: copiar },
         { g: "Exportar", n: "Baixar CSV numérico", k: "csv exportar numerico", f: function () { $("#bCsvN").click(); } },

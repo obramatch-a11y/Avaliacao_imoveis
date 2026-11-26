@@ -159,7 +159,7 @@ async def status_coleta(job_id: str):
     import time
     return {
         "estado": j["estado"], "pagina": j["pagina"], "paginas": j["params"].limite_paginas,
-        "encontrados": j["encontrados"], "previa": j["previa"], "erro": j["erro"],
+        "encontrados": j["encontrados"], "fontes": len(j["fontes"]), "previa": j["previa"], "erro": j["erro"],
         "segundos": int(time.time() - j["inicio"]),
     }
 
