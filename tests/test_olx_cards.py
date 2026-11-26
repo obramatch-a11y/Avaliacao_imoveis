@@ -24,3 +24,36 @@ def test_fotos_do_card_e_dominio_permitido():
     assert not host_permitido("http://img.olx.com.br/a.jpg") and not host_permitido("https://olx.com.br.evil.com/a.jpg")
     pag = '<meta property="og:image" content="https://img.olx.com.br/images/9/z.jpg"><script type="application/ld+json">{"image":["https://img.olx.com.br/images/9/y.jpg"]}</script>'
     assert fotos_de_anuncio(pag) == ["https://img.olx.com.br/images/9/y.jpg", "https://img.olx.com.br/images/9/z.jpg"]
+
+
+def test_coleta_assincrona_com_cancelamento(monkeypatch):
+    import time
+    from fastapi.testclient import TestClient
+    import app.main as m
+
+    async def falso_buscar(self, params, ao_progredir=None, cancelado=None):
+        itens = []
+        for pg in range(1, 4):
+            if cancelado and cancelado():
+                break
+            itens.append({"fonte": "OLX", "titulo": f"Apto {pg}", "preco": f"R$ {300000 + pg}", "area": "50", "quartos": "2",
+                          "bairro": "Piedade", "url": f"https://pe.olx.com.br/{pg}"})
+            if ao_progredir:
+                ao_progredir(pg, itens)
+            import asyncio
+            await asyncio.sleep(0.2)
+        return itens
+
+    monkeypatch.setattr(m.OLXScraper, "buscar", falso_buscar)
+    with TestClient(m.app) as c:
+        r = c.post("/coleta", data={"uf": "PE", "cidade": "Recife", "limite_paginas": 3})
+        jid = r.json()["id"]
+        time.sleep(0.3)
+        c.post(f"/coleta/{jid}/cancelar")
+        for _ in range(30):
+            st = c.get(f"/coleta/{jid}").json()
+            if st["estado"] != "rodando":
+                break
+            time.sleep(0.1)
+        assert st["estado"] == "interrompida" and 1 <= st["encontrados"] < 3
+        assert "Apto 1" in c.get(f"/coleta/{jid}/resultado").text

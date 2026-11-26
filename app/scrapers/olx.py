@@ -266,7 +266,7 @@ class OLXScraper(BaseScraper):
             self.diagnostico.append(f"Página {pagina}: obtida após {tentativa} tentativas")
         return resp
 
-    async def buscar(self, params: BuscaImovelInput) -> list[dict]:
+    async def buscar(self, params: BuscaImovelInput, ao_progredir=None, cancelado=None) -> list[dict]:
         coletados: list[dict] = []
         urls_vistas: set[str] = set()
 
@@ -292,6 +292,9 @@ class OLXScraper(BaseScraper):
             modo = "caminho"
             pagina = 1
             while pagina <= params.limite_paginas:
+                if cancelado and cancelado():
+                    self.diagnostico.append(f"Coleta interrompida antes da página {pagina}; resultados parciais mantidos.")
+                    break
                 url = self._montar_url(params, pagina, modo)
                 try:
                     alvo = modelo_api.replace("{url}", quote(url, safe="")) if modelo_api else url
@@ -343,6 +346,8 @@ class OLXScraper(BaseScraper):
                             urls_vistas.add(link)
                         coletados.append(item)
 
+                    if ao_progredir:
+                        ao_progredir(pagina, coletados)
                     pagina += 1
                     await asyncio.sleep(1.5)
                 except Exception as exc:
