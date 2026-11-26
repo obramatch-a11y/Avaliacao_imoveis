@@ -69,3 +69,27 @@ def test_chaves_na_mao_cartao():
     it = sc._extrair_de_html_cards(BeautifulSoup(html, "lxml"))[0]
     assert (it["preco"], it["bairro"], it["quartos"], it["area"], it["vagas"]) == ("R$ 450.000", "Piedade", "2", "59", "1")
     assert it["fonte"] == "Chaves na Mão" and it["fotos"] == ["https://images.chavesnamao.com.br/x.jpg"]
+
+
+def test_resultado_parcial_enquanto_coleta_roda(monkeypatch):
+    import asyncio
+    import time
+    from fastapi.testclient import TestClient
+    import app.main as m
+
+    async def lento(self, params, ao_progredir=None, cancelado=None):
+        itens = [{"fonte": "OLX", "titulo": "Apto A", "preco": "R$ 300.000", "area": "50", "quartos": "2", "bairro": "Piedade", "url": "https://pe.olx.com.br/a"}]
+        ao_progredir(1, itens)
+        for _ in range(40):
+            if cancelado():
+                break
+            await asyncio.sleep(0.1)
+        return itens
+
+    monkeypatch.setattr(m.OLXScraper, "buscar", lento)
+    with TestClient(m.app) as c:
+        jid = c.post("/coleta", data={"uf": "PE", "cidade": "Recife", "fontes": "olx"}).json()["id"]
+        time.sleep(0.3)
+        html = c.get(f"/coleta/{jid}/resultado").text
+        assert "Coleta em andamento" in html and "Apto A" in html
+        c.post(f"/coleta/{jid}/cancelar")

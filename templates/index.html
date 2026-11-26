@@ -440,10 +440,16 @@
       <section class="card prog" id="prog" role="status" aria-live="polite">
         <strong id="progT">Coletando…</strong><div class="bar-p" aria-hidden="true"><i id="progB"></i></div>
         <span class="muted" id="progD"></span><ul id="progL"></ul>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="progX">Interromper e ver o que já foi coletado</button></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#" id="parcLink">Abrir resultados parciais</a><button class="btn" type="button" id="progX">Interromper e ver o que já foi coletado</button></div>
       </section>
       <div class="sk" id="sk" aria-hidden="true"><i></i><i class="t"></i><i class="t"></i></div>
 
+      {% if coleta_ativa %}
+      <section class="aviso" role="status" style="border-left-color:var(--accent)"><h3>Coleta em andamento</h3>
+        <p>Resultados parciais: {{ coleta_ativa.n }} imóveis até agora. A coleta continua no servidor. Faça a curadoria com calma, mas as marcações só são mantidas até você atualizar.</p>
+        <p style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="/coleta/{{ coleta_ativa.id }}/resultado">Atualizar resultados</a>
+        <button class="btn" type="button" id="parcX" data-job="{{ coleta_ativa.id }}">Interromper coleta</button></p></section>
+      {% endif %}
       {% if tem %}
       <section class="kpis" id="kpis" aria-label="Indicadores da amostra">
         <div class="kpi hero"><span>Amostras em uso</span><strong id="k-n">–</strong><em id="k-de">de {{ amostras|length }} coletadas</em></div>
@@ -697,6 +703,8 @@
       var pr = $("#prog"); pr.classList.add("on"); $("#progX").hidden = false; $("#progX").disabled = false; $("#progT").textContent = "Iniciando coleta…"; $("#progD").textContent = ""; $("#progL").textContent = ""; $("#progB").style.width = "4%";
       fetch("/coleta", { method: "POST", body: new FormData(form) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
         if (!x.ok) return falha(x.j.erro || "Confira os campos informados."); jobId = x.j.id; poll(); pollT = setInterval(poll, 1500); }).catch(function () { falha("Sem conexão com o servidor. Verifique a internet e tente de novo."); }); });
+    var pxb = $("#parcX"); if (pxb) pxb.addEventListener("click", function () { this.disabled = true; this.textContent = "Interrompendo…"; fetch("/coleta/" + this.getAttribute("data-job") + "/cancelar", { method: "POST" }).then(function () { setTimeout(function () { location.reload(); }, 3500); }); });
+    $("#parcLink").addEventListener("click", function (e) { e.preventDefault(); if (jobId) location.href = "/coleta/" + jobId + "/resultado"; });
     $("#progX").addEventListener("click", function () { if (!jobId) return; this.disabled = true; this.textContent = "Interrompendo…"; fetch("/coleta/" + jobId + "/cancelar", { method: "POST" }); });
     $("#bEditar").addEventListener("click", function () { var s = $("#sec-param"), o = s.classList.toggle("open"); this.setAttribute("aria-expanded", o); });
 

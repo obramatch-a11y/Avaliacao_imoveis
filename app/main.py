@@ -81,7 +81,7 @@ def normalizar_lista(brutos: list[dict], params: BuscaImovelInput) -> list[Amost
     return normalizados
 
 
-def _resposta_resultado(request: Request, normalizados, params, diagnostico):
+def _resposta_resultado(request: Request, normalizados, params, diagnostico, coleta_ativa=None):
     validas = sum(1 for a in normalizados if a.alerta_saneamento == "OK")
     return templates.TemplateResponse(
         "index.html",
@@ -91,6 +91,7 @@ def _resposta_resultado(request: Request, normalizados, params, diagnostico):
             "status_nbr": avaliar_grau_nbr14653(validas),
             "filtros": params.model_dump(),
             "diagnostico": diagnostico,
+            "coleta_ativa": coleta_ativa,
         },
     )
 
@@ -104,6 +105,7 @@ async def _rodar_job(job_id: str):
     def progresso(pagina: int, coletados: list[dict]):
         job["pagina"] = pagina
         job["encontrados"] = len(coletados)
+        job["parcial"] = list(coletados)
         job["previa"] = [
             {"titulo": (c.get("titulo") or "")[:70], "preco": c.get("preco") or ""} for c in coletados[-5:]
         ]
@@ -145,7 +147,7 @@ async def iniciar_coleta(
     job_id = uuid.uuid4().hex[:12]
     JOBS[job_id] = {
         "params": params, "fontes": fontes, "estado": "rodando", "pagina": 0, "encontrados": 0,
-        "previa": [], "cancelar": False, "resultado": None, "diagnostico": [], "erro": "", "inicio": time.time(),
+        "previa": [], "parcial": [], "cancelar": False, "resultado": None, "diagnostico": [], "erro": "", "inicio": time.time(),
     }
     JOBS[job_id]["tarefa"] = asyncio.create_task(_rodar_job(job_id))
     return {"id": job_id}
@@ -176,10 +178,18 @@ async def cancelar_coleta(job_id: str):
 async def resultado_coleta(request: Request, job_id: str):
     global ULTIMA_COLETA
     j = JOBS.get(job_id)
-    if not j or j["resultado"] is None:
+    if not j:
         return RedirectResponse("/", status_code=303)
-    ULTIMA_COLETA = j["resultado"]
-    return _resposta_resultado(request, ULTIMA_COLETA, j["params"], j["diagnostico"])
+    if j["resultado"] is not None:
+        ULTIMA_COLETA = j["resultado"]
+        diag, ativa = j["diagnostico"], None
+    elif j["parcial"]:
+        ULTIMA_COLETA = normalizar_lista(list(j["parcial"]), j["params"])
+        diag, ativa = [], {"id": job_id, "n": j["encontrados"]}
+    else:
+        return RedirectResponse("/", status_code=303)
+    resp = _resposta_resultado(request, ULTIMA_COLETA, j["params"], diag, ativa)
+    return resp
 
 
 @app.get("/", response_class=HTMLResponse)
