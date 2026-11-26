@@ -228,6 +228,21 @@ class OLXScraper(BaseScraper):
             )
         return resultados
 
+    RETENTAVEIS = {409, 423, 429, 500, 502, 503, 504}
+
+    async def _get_com_tentativas(self, client: httpx.AsyncClient, alvo: str, pagina: int, max_tentativas: int = 4):
+        """Repete a requisição quando o proxy acusa bloqueio passageiro (ex.: 423 antibot)."""
+        resp = None
+        for tentativa in range(1, max_tentativas + 1):
+            resp = await client.get(alvo)
+            if resp.status_code not in self.RETENTAVEIS:
+                break
+            if tentativa < max_tentativas:
+                await asyncio.sleep(3 * tentativa)
+        if resp is not None and tentativa > 1 and resp.status_code == 200:
+            self.diagnostico.append(f"Página {pagina}: obtida após {tentativa} tentativas")
+        return resp
+
     async def buscar(self, params: BuscaImovelInput) -> list[dict]:
         coletados: list[dict] = []
         urls_vistas: set[str] = set()
@@ -257,7 +272,7 @@ class OLXScraper(BaseScraper):
                 url = self._montar_url(params, pagina, modo)
                 try:
                     alvo = modelo_api.replace("{url}", quote(url, safe="")) if modelo_api else url
-                    resp = await client.get(alvo)
+                    resp = await self._get_com_tentativas(client, alvo, pagina)
                     itens: list[dict] = []
                     self.debug["urls"].append(url)
                     if resp.status_code == 200:
