@@ -1,3 +1,4 @@
+from fastapi.responses import JSONResponse
 from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, Form, Request
@@ -137,6 +138,27 @@ async def executar_busca(
             "diagnostico": scraper.diagnostico,
         },
     )
+
+
+FOTOS_CACHE: dict[int, list[str]] = {}
+
+
+@app.get("/fotos/{id_amostra}")
+async def fotos_amostra(id_amostra: int):
+    """Carrega a galeria completa de um anúncio sob demanda (com cache; não bloqueia a coleta)."""
+    amostra = next((a for a in ULTIMA_COLETA if a.id_amostra == id_amostra), None)
+    if amostra is None:
+        return JSONResponse({"fotos": [], "erro": "Amostra não encontrada."}, status_code=404)
+    if id_amostra in FOTOS_CACHE:
+        return {"fotos": FOTOS_CACHE[id_amostra], "cache": True}
+    try:
+        fotos = await OLXScraper().fotos_do_anuncio(amostra.url_anuncio)
+    except Exception:
+        fotos = []
+    if not fotos:
+        return {"fotos": amostra.fotos, "aviso": "Não foi possível carregar mais fotos agora. Tente novamente em instantes."}
+    FOTOS_CACHE[id_amostra] = fotos
+    return {"fotos": fotos}
 
 
 @app.post("/exportar-csv")

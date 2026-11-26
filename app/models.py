@@ -40,3 +40,4 @@ class AmostraMercado(BaseModel):
     alerta_saneamento: str = "OK"
     titulo_anuncio: str = ""
     url_anuncio: str = ""
+    fotos: list[str] = Field(default_factory=list)

@@ -6,6 +6,7 @@ from urllib.parse import quote, quote_plus
 import httpx
 from bs4 import BeautifulSoup
 from app.models import BuscaImovelInput
+from app.fotos import fotos_de_anuncio, fotos_de_tag, host_permitido
 from app.normalizer import remover_acentos
 from app.scrapers.base import BaseScraper
 
@@ -146,6 +147,10 @@ class OLXScraper(BaseScraper):
                         "detalhes": " ".join(f"{k}:{v}" for k, v in propriedades.items()),
                         "descricao": ad.get("body", ""),
                         "url": ad.get("url", ""),
+                        "fotos": [
+                            str(im.get("original") or im.get("originalWebp") or im.get("url") or "")
+                            for im in (ad.get("images") or []) if isinstance(im, dict)
+                        ],
                     }
                 )
         except Exception:
@@ -224,9 +229,27 @@ class OLXScraper(BaseScraper):
                     "detalhes": texto_card,
                     "descricao": "",
                     "url": link_tag["href"] if link_tag else "",
+                    "fotos": fotos_de_tag(card),
                 }
             )
         return resultados
+
+    async def fotos_do_anuncio(self, url: str) -> list[str]:
+        """Busca a página pública do anúncio e extrai as fotos. Usa o mesmo canal da coleta."""
+        if not host_permitido(url):
+            return []
+        proxy_url = "".join((os.getenv("OLX_PROXY_URL") or "").split()) or None
+        verificar_ssl = os.getenv("OLX_PROXY_VERIFY_SSL", "true").lower() != "false"
+        modelo_api = "".join((os.getenv("OLX_FETCH_TEMPLATE") or "").split()) or None
+        async with httpx.AsyncClient(
+            headers=self.HEADERS, timeout=90.0 if (proxy_url or modelo_api) else 20.0,
+            follow_redirects=False, proxy=proxy_url, verify=verificar_ssl,
+        ) as client:
+            alvo = modelo_api.replace("{url}", quote(url, safe="")) if modelo_api else url
+            resp = await self._get_com_tentativas(client, alvo, 0, max_tentativas=3)
+            if resp.status_code != 200:
+                return []
+            return fotos_de_anuncio(resp.text[:3_000_000])
 
     RETENTAVEIS = {409, 423, 429, 500, 502, 503, 504}
 
