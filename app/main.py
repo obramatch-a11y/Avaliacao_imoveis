@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from app import conta
 from app.exporter import gerar_csv
 from app.models import AmostraMercado, BuscaImovelInput
 from app.normalizer import normalizar_registro_bruto
@@ -62,8 +63,54 @@ async def canal():
     return {"servidor": bool(("".join((os.getenv("OLX_FETCH_TEMPLATE") or "").split())) or os.getenv("OLX_PROXY_URL"))}
 
 
+def usuario_da(request: Request | None) -> dict | None:
+    return conta.ler_sessao(request.cookies.get(conta.COOKIE)) if request is not None else None
+
+
+async def chave_do_pedido(request: Request, enviada: str = "") -> str | None:
+    """Chave enviada pelo navegador ou, se a pessoa estiver logada, a guardada na conta dela."""
+    c = chave_valida(enviada)
+    if c:
+        return c
+    u = usuario_da(request)
+    return await conta.buscar_chave(u["sub"]) if u else None
+
+
+@app.get("/auth/config")
+async def auth_config(request: Request):
+    u = usuario_da(request)
+    tem = bool(u and await conta.buscar_chave(u["sub"]))
+    return {
+        "login": conta.login_disponivel(), "client_id": conta.client_id() if conta.login_disponivel() else "",
+        "cofre": conta.cofre_disponivel(), "usuario": {"nome": u["nome"], "email": u["email"]} if u else None, "tem_chave": tem,
+    }
+
+
+@app.post("/auth/google")
+async def auth_google(credential: str = Form("")):
+    u = await conta.verificar_google(credential)
+    if not u:
+        return JSONResponse({"ok": False, "erro": "Não foi possível confirmar o login com o Google."}, status_code=401)
+    resp = JSONResponse({"ok": True, "usuario": {"nome": u["nome"], "email": u["email"]}, "tem_chave": bool(await conta.buscar_chave(u["sub"]))})
+    resp.set_cookie(conta.COOKIE, conta.criar_sessao(u), max_age=conta.DURACAO, httponly=True, secure=True, samesite="lax")
+    return resp
+
+
+@app.post("/auth/sair")
+async def auth_sair():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(conta.COOKIE)
+    return resp
+
+
+@app.post("/chave/remover")
+async def remover_chave_conta(request: Request):
+    u = usuario_da(request)
+    return {"ok": await conta.remover_chave(u["sub"]) if u else False}
+
+
 @app.post("/chave/validar")
-async def validar_chave(chave: str = Form("")):
+async def validar_chave(request: Request, chave: str = Form("")):
     """Testa a chave do ScrapingAnt consultando só o saldo de créditos. Não guarda nada no servidor."""
     c = chave_valida(chave)
     if not c:
@@ -81,7 +128,9 @@ async def validar_chave(chave: str = Form("")):
         j = r.json()
     except ValueError:
         j = {}
-    return {"ok": True, "restantes": j.get("remained_credits"), "total": j.get("plan_total_credits")}
+    u = usuario_da(request)
+    guardada = await conta.guardar_chave(u["sub"], u["email"], c) if u else False
+    return {"ok": True, "restantes": j.get("remained_credits"), "total": j.get("plan_total_credits"), "na_conta": guardada}
 templates = Jinja2Templates(directory="templates")
 
 ULTIMA_COLETA: list[AmostraMercado] = []
@@ -161,6 +210,7 @@ async def _rodar_job(job_id: str):
 
 @app.post("/coleta")
 async def iniciar_coleta(
+    request: Request,
     uf: str = Form(...), cidade: str = Form(...), bairro: str = Form(""), finalidade: str = Form("VENDA"),
     tipo_imovel: str = Form("APARTAMENTO"), area_min: Optional[str] = Form(None), area_max: Optional[str] = Form(None),
     quartos_min: Optional[str] = Form(None), preco_min: Optional[str] = Form(None), preco_max: Optional[str] = Form(None),
@@ -187,7 +237,7 @@ async def iniciar_coleta(
     job_id = uuid.uuid4().hex[:12]
     JOBS[job_id] = {
         "params": params, "fontes": fontes, "estado": "rodando", "pagina": 0, "encontrados": 0,
-        "chave": chave_valida(chave), "previa": [], "parcial": [], "cancelar": False, "resultado": None, "diagnostico": [], "erro": "", "inicio": time.time(),
+        "chave": await chave_do_pedido(request, chave), "previa": [], "parcial": [], "cancelar": False, "resultado": None, "diagnostico": [], "erro": "", "inicio": time.time(),
     }
     JOBS[job_id]["tarefa"] = asyncio.create_task(_rodar_job(job_id))
     return {"id": job_id}
@@ -337,7 +387,7 @@ async def fotos_amostra(id_amostra: int, request: Request):
     if id_amostra in FOTOS_CACHE:
         return {"fotos": FOTOS_CACHE[id_amostra], "cache": True}
     try:
-        fotos = await OLXScraper(chave_valida(request.headers.get("x-chave-api", ""))).fotos_do_anuncio(amostra.url_anuncio)
+        fotos = await OLXScraper(await chave_do_pedido(request, request.headers.get("x-chave-api", ""))).fotos_do_anuncio(amostra.url_anuncio)
     except Exception:
         fotos = []
     if not fotos:

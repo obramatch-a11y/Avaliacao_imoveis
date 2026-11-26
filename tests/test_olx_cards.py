@@ -149,9 +149,53 @@ def test_validar_chave_respostas(monkeypatch):
         return Cli
 
     monkeypatch.setattr(httpx, "AsyncClient", falso(200, {"remained_credits": 9000, "plan_total_credits": 10000}))
-    assert asyncio.run(main.validar_chave(k)) == {"ok": True, "restantes": 9000, "total": 10000}
+    assert asyncio.run(main.validar_chave(None, k)) == {"ok": True, "restantes": 9000, "total": 10000, "na_conta": False}
     monkeypatch.setattr(httpx, "AsyncClient", falso(403))
-    assert asyncio.run(main.validar_chave(k))["ok"] is False
+    assert asyncio.run(main.validar_chave(None, k))["ok"] is False
     monkeypatch.setattr(httpx, "AsyncClient", falso(500))
-    assert asyncio.run(main.validar_chave(k)).get("incerto") is True
-    assert asyncio.run(main.validar_chave("lixo"))["ok"] is False
+    assert asyncio.run(main.validar_chave(None, k)).get("incerto") is True
+    assert asyncio.run(main.validar_chave(None, "lixo"))["ok"] is False
+
+
+def test_sessao_assinada_e_cofre_criptografado(monkeypatch):
+    from app import conta
+    monkeypatch.setenv("SESSION_SECRET", "x" * 40)
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "id.apps.googleusercontent.com")
+    assert conta.login_disponivel() and not conta.cofre_disponivel()
+    ck = conta.criar_sessao({"sub": "123", "email": "a@b.c", "nome": "A"})
+    assert conta.ler_sessao(ck)["sub"] == "123"
+    assert conta.ler_sessao(ck[:-2] + "00") is None and conta.ler_sessao("lixo") is None
+    monkeypatch.setenv("SESSION_SECRET", "y" * 40)
+    assert conta.ler_sessao(ck) is None  # outro segredo não valida
+    monkeypatch.setenv("SESSION_SECRET", "x" * 40)
+    t = conta.cifrar("0123456789abcdef0123456789abcdef")
+    assert "0123456789abcdef" not in t and conta.decifrar(t) == "0123456789abcdef0123456789abcdef"
+    monkeypatch.setenv("SESSION_SECRET", "z" * 40)
+    assert conta.decifrar(t) is None
+
+
+def test_login_google_rejeita_token_de_outro_app(monkeypatch):
+    import asyncio
+    import httpx
+    from app import conta
+    monkeypatch.setenv("SESSION_SECRET", "x" * 40)
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "meu.apps.googleusercontent.com")
+
+    def falso(j):
+        class R:
+            status_code = 200
+            def json(self): return j
+        class Cli:
+            def __init__(self, *a, **k): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+            async def get(self, *a, **k): return R()
+        return Cli
+
+    bom = {"aud": "meu.apps.googleusercontent.com", "iss": "https://accounts.google.com", "email_verified": "true", "sub": "9", "email": "a@b.c", "name": "A"}
+    monkeypatch.setattr(httpx, "AsyncClient", falso(bom))
+    assert asyncio.run(conta.verificar_google("tok"))["sub"] == "9"
+    monkeypatch.setattr(httpx, "AsyncClient", falso({**bom, "aud": "outro"}))
+    assert asyncio.run(conta.verificar_google("tok")) is None
+    monkeypatch.setattr(httpx, "AsyncClient", falso({**bom, "email_verified": "false"}))
+    assert asyncio.run(conta.verificar_google("tok")) is None

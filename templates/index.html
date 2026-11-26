@@ -203,6 +203,7 @@
     tbody tr.hl td { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
     td.n, th.n { text-align: right; }
     .tag { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+    [hidden] { display: none !important; }
     .tag.val { background: var(--accent-bg, var(--ok-bg)); color: var(--ok); margin-left: 4px; }
     tbody tr.edit td[data-f] strong, tbody tr.edit td[data-f] { text-decoration: underline dotted; text-underline-offset: 3px; }
     .colsel { position: relative; } .colsel summary { list-style: none; cursor: pointer; } .colsel summary::-webkit-details-marker { display: none; }
@@ -599,16 +600,21 @@
   <dialog class="cmp" id="dlgChave" aria-label="Liberar a importação de anúncios">
     <div style="padding:18px 20px;display:grid;gap:12px;max-width:520px">
       <h2 style="margin:0;font-size:18px">Liberar a importação de anúncios</h2>
-      <p class="note" style="margin:0">A OLX bloqueia consultas feitas direto por servidores. Para importar, usamos o serviço gratuito <b>ScrapingAnt</b>, com a <b>sua própria conta</b>: assim a cota gratuita é sua e não divide com ninguém. <b>Este login é do ScrapingAnt, não do nosso app</b>: a senha fica só com eles e nós nunca a vemos.</p>
-      <ol style="margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px">
+      <p class="note" style="margin:0">A OLX bloqueia consultas feitas direto por servidores. Para importar, usamos o serviço gratuito <b>ScrapingAnt</b>, com a <b>sua própria conta</b>: assim a cota gratuita é sua e não divide com ninguém. São dois logins diferentes: o do nosso app (Google) e o do ScrapingAnt (passo 1). A senha do ScrapingAnt fica só com eles e nós nunca a vemos.</p>
+      <div id="chLogin" hidden style="display:grid;gap:8px;border:1px solid var(--line);border-radius:12px;padding:12px">
+        <p id="chConta" style="margin:0;font-size:14px"></p>
+        <div id="gBtn"></div>
+        <button type="button" class="btn" id="chSair" hidden>Sair da conta</button>
+      </div>
+      <div id="chPassos" style="display:grid;gap:12px"><ol style="margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px">
         <li><button type="button" class="btn pri" id="chAbrir">Entrar ou criar conta no ScrapingAnt</button> <small class="muted">(abre numa janela separada)</small></li>
         <li>No painel, clique no ícone de <b>copiar</b> ao lado de “API token”.</li>
         <li><button type="button" class="btn" id="chLer">Já copiei: liberar</button> <small class="muted">(o app lê a chave copiada e testa sozinho)</small></li>
       </ol>
       <details><summary class="muted" style="cursor:pointer;font-size:13px">Prefere colar a chave manualmente?</summary>
         <div style="display:flex;gap:8px;margin-top:8px"><input id="chManual" placeholder="Cole aqui o API token" autocomplete="off" style="flex:1;height:38px;padding:0 10px;font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px"><button type="button" class="btn" id="chUsar">Usar</button></div></details>
-      <p id="chMsg" role="status" style="margin:0;font-size:14px"></p>
-      <p class="note g" style="margin:0">A chave fica guardada só neste aparelho e é enviada ao nosso servidor apenas durante a sua busca, sem ser registrada nem salva.</p>
+      </div><p id="chMsg" role="status" style="margin:0;font-size:14px"></p>
+      <p class="note g" id="chNota" style="margin:0">A chave fica guardada só neste aparelho e é enviada ao nosso servidor apenas durante a sua busca, sem ser registrada nem salva.</p>
       <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn" id="chRemover" hidden>Remover chave deste aparelho</button><button type="button" class="btn" id="chFechar">Fechar</button></div>
     </div>
   </dialog>
@@ -729,15 +735,34 @@
     /* ---------- Liberar importação (chave do ScrapingAnt da própria pessoa) ---------- */
     var CHAVE = ""; try { CHAVE = localStorage.getItem("ie-chave") || ""; } catch (e) {}
     var canalServidor = true, dlgC = $("#dlgChave");
-    function chStatus() { var el = $("#chStatus"), ok = !!CHAVE; el.textContent = ok ? "Importação da OLX: liberada ✓" : (canalServidor ? "Importação da OLX: canal do servidor" : "Importação da OLX: precisa liberar"); el.classList.toggle("w", !ok && !canalServidor); $("#chRemover").hidden = !ok; $("#chAbrirDlg").textContent = ok ? "Trocar chave" : "Liberar importação"; }
+    var AUTH = { login: false, usuario: null, tem_chave: false, cofre: false };
+    function temLiberacao() { return !!CHAVE || !!AUTH.tem_chave; }
+    function chTela() {
+      var box = $("#chLogin"), pass = $("#chPassos"); box.hidden = !AUTH.login; pass.hidden = AUTH.login && !AUTH.usuario;
+      $("#chConta").innerHTML = AUTH.usuario ? "Conectado como <b>" + esc(AUTH.usuario.email) + "</b>. A liberação fica guardada na sua conta e vale em qualquer aparelho." : "<b>Entre com sua conta Google</b> para que a liberação fique guardada na sua conta, em qualquer aparelho. Este é o login do nosso app.";
+      $("#gBtn").hidden = !!AUTH.usuario; $("#chSair").hidden = !AUTH.usuario;
+      $("#chNota").textContent = AUTH.usuario && AUTH.cofre ? "A chave é guardada criptografada na sua conta e usada só nas suas buscas. Você pode removê-la quando quiser." : "A chave fica guardada só neste aparelho e é enviada ao nosso servidor apenas durante a sua busca, sem ser registrada nem salva.";
+    }
+    function chIniciarGoogle(clientId) {
+      var sc = document.createElement("script"); sc.src = "https://accounts.google.com/gsi/client"; sc.async = true;
+      sc.onload = function () { if (!window.google || !google.accounts) return;
+        google.accounts.id.initialize({ client_id: clientId, callback: function (resp) { var fd = new FormData(); fd.append("credential", resp.credential);
+          fetch("/auth/google", { method: "POST", body: fd }).then(function (r) { return r.json(); }).then(function (j) { if (j.ok) { AUTH.usuario = j.usuario; AUTH.tem_chave = !!j.tem_chave; chTela(); chStatus(); chMsg(j.tem_chave ? "Importação já liberada nesta conta ✓" : "Agora siga os passos abaixo para liberar a importação."); } else chMsg(j.erro || "Falha no login.", true); }).catch(function () { chMsg("Sem conexão com o servidor.", true); }); } });
+        google.accounts.id.renderButton($("#gBtn"), { theme: "outline", size: "large", text: "signin_with", locale: "pt-BR" }); };
+      document.head.appendChild(sc);
+    }
+    function chCarregarAuth() { fetch("/auth/config").then(function (r) { return r.json(); }).then(function (j) { AUTH = { login: !!j.login, usuario: j.usuario, tem_chave: !!j.tem_chave, cofre: !!j.cofre }; chTela(); chStatus(); if (AUTH.login && !AUTH.usuario) chIniciarGoogle(j.client_id); }).catch(function () {}); }
+    chCarregarAuth();
+    $("#chSair").addEventListener("click", function () { fetch("/auth/sair", { method: "POST" }).then(function () { AUTH.usuario = null; AUTH.tem_chave = false; chTela(); chStatus(); chCarregarAuth(); chMsg("Você saiu da conta."); }); });
+    function chStatus() { var el = $("#chStatus"), ok = temLiberacao(); el.textContent = ok ? "Importação da OLX: liberada ✓" : (canalServidor ? "Importação da OLX: canal do servidor" : (AUTH.login && !AUTH.usuario ? "Importação da OLX: entre com Google" : "Importação da OLX: precisa liberar")); el.classList.toggle("w", !ok && !canalServidor); $("#chRemover").hidden = !ok; if (AUTH.usuario) $("#chAbrirDlg").textContent = ok ? "Trocar chave" : "Liberar importação"; $("#chAbrirDlg").textContent = ok ? "Trocar chave" : "Liberar importação"; }
     fetch("/canal").then(function (r) { return r.json(); }).then(function (j) { canalServidor = !!j.servidor; chStatus(); }).catch(function () { chStatus(); }); chStatus();
     function chMsg(t, erro) { var m = $("#chMsg"); m.textContent = t; m.style.color = erro ? "var(--bad, #b3261e)" : "var(--ok)"; }
     function chValidar(texto) {
       var c = (texto || "").trim(); if (!c) return chMsg("Não encontrei nada copiado. Copie o “API token” e tente de novo.", true);
       chMsg("Testando a chave…"); var fd = new FormData(); fd.append("chave", c);
       fetch("/chave/validar", { method: "POST", body: fd }).then(function (r) { return r.json(); }).then(function (j) {
-        if (j.ok) { CHAVE = c; try { localStorage.setItem("ie-chave", c); } catch (e) {} chStatus();
-          chMsg("Importação liberada ✓" + (j.restantes != null ? " · " + nf0.format(j.restantes) + (j.total ? " de " + nf0.format(j.total) : "") + " créditos restantes" : "")); toast("Importação liberada"); setTimeout(function () { if (dlgC.open) dlgC.close(); }, 1400); }
+        if (j.ok) { if (j.na_conta) { AUTH.tem_chave = true; CHAVE = ""; try { localStorage.removeItem("ie-chave"); } catch (e) {} } else { CHAVE = c; try { localStorage.setItem("ie-chave", c); } catch (e) {} } chStatus();
+          chMsg("Importação liberada ✓" + (j.na_conta ? " (guardada na sua conta)" : "") + (j.restantes != null ? " · " + nf0.format(j.restantes) + (j.total ? " de " + nf0.format(j.total) : "") + " créditos restantes" : "")); toast("Importação liberada"); setTimeout(function () { if (dlgC.open) dlgC.close(); }, 1400); }
         else if (j.incerto) { chMsg(j.erro + " Se tiver certeza de que a chave está certa, clique em “Usar” para guardá-la mesmo assim.", true); $("#chManual").value = c; }
         else chMsg(j.erro || "Chave não aceita.", true); }).catch(function () { chMsg("Sem conexão com o servidor. Tente de novo.", true); });
     }
@@ -747,13 +772,13 @@
     $("#chAbrir").addEventListener("click", function () { chMsg("Entre no ScrapingAnt, copie o API token e volte aqui."); window.open("https://app.scrapingant.com/signup", "scrapingant", "popup,width=520,height=760"); });
     $("#chLer").addEventListener("click", chLer); $("#chUsar").addEventListener("click", function () { var c = $("#chManual").value.trim(); if (!c) return chMsg("Cole a chave no campo.", true); chValidar(c); });
     $("#chFechar").addEventListener("click", function () { dlgC.close(); });
-    $("#chRemover").addEventListener("click", function () { CHAVE = ""; try { localStorage.removeItem("ie-chave"); } catch (e) {} chStatus(); chMsg("Chave removida deste aparelho."); });
+    $("#chRemover").addEventListener("click", function () { if (AUTH.usuario) { fetch("/chave/remover", { method: "POST" }); AUTH.tem_chave = false; } CHAVE = ""; try { localStorage.removeItem("ie-chave"); } catch (e) {} chStatus(); chMsg("Chave removida deste aparelho."); });
     addEventListener("focus", function () { if (dlgC.open && !CHAVE && navigator.clipboard && navigator.clipboard.readText && /(ScrapingAnt|Entre)/.test($("#chMsg").textContent)) navigator.clipboard.readText().then(function (t) { if (/^[A-Za-z0-9_-]{16,80}$/.test((t || "").trim())) chValidar(t); }).catch(function () { /* sem permissão: o botão “Já copiei” continua disponível */ }); });
     form.addEventListener("submit", function (e) {
       if (!window.fetch || !window.FormData) { document.body.classList.add("loading"); return; }
       e.preventDefault();
       var temOlx = $$('input[name="fontes"]:checked', form).some(function (c) { return c.value === "olx"; });
-      if (temOlx && !CHAVE && !canalServidor) { chMsg("Para importar da OLX, libere a importação primeiro."); dlgC.showModal(); return; } guardarRecente(); var b = $("#btnBuscar"); b.classList.add("busy"); b.disabled = true; $("#btnTxt").textContent = "Coletando…";
+      if (temOlx && !temLiberacao() && !canalServidor) { chMsg(AUTH.login && !AUTH.usuario ? "Para importar da OLX, entre com sua conta Google e libere a importação." : "Para importar da OLX, libere a importação primeiro."); dlgC.showModal(); return; } guardarRecente(); var b = $("#btnBuscar"); b.classList.add("busy"); b.disabled = true; $("#btnTxt").textContent = "Coletando…";
       $$("#kpis, #sec-graf, #sec-tab").forEach(function (el) { el.style.display = "none"; }); $("#sec-param").classList.remove("open");
       var pr = $("#prog"); pr.classList.add("on"); $("#progX").hidden = false; $("#progX").disabled = false; $("#progT").textContent = "Iniciando coleta…"; $("#progD").textContent = ""; $("#progL").textContent = ""; $("#progB").style.width = "4%";
       fetch("/coleta", { method: "POST", body: (function () { var fd = new FormData(form); if (CHAVE) fd.append("chave", CHAVE); return fd; })() }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
