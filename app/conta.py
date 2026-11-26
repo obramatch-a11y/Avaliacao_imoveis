@@ -3,7 +3,7 @@
 Variáveis de ambiente (todas opcionais; sem elas o app continua funcionando sem login):
   GOOGLE_CLIENT_ID       ID do cliente OAuth (público) criado no Google Cloud
   SESSION_SECRET         texto longo e aleatório; assina a sessão e deriva a chave de criptografia
-  SUPABASE_URL / SUPABASE_SERVICE_KEY   onde as chaves (já criptografadas) ficam guardadas
+  FIREBASE_SERVICE_ACCOUNT   JSON da conta de serviço do Firebase (Firestore guarda as chaves já criptografadas)
 """
 import base64
 import hashlib
@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 
 COOKIE = "ie_sessao"
 DURACAO = 30 * 24 * 3600
@@ -34,7 +36,7 @@ def login_disponivel() -> bool:
 
 
 def cofre_disponivel() -> bool:
-    return bool(login_disponivel() and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY"))
+    return bool(login_disponivel() and _conta_servico())
 
 
 # ---------- sessão assinada ----------
@@ -95,26 +97,72 @@ def decifrar(token: str) -> str | None:
         return None
 
 
-def _cab() -> dict:
-    k = os.getenv("SUPABASE_SERVICE_KEY", "")
-    return {"apikey": k, "Authorization": f"Bearer {k}", "Content-Type": "application/json"}
+# ---------- Firestore (plano gratuito do Firebase), acessado pelo servidor com conta de serviço ----------
+_TOKEN: dict = {"v": None, "exp": 0.0}
 
 
-def _url() -> str:
-    return os.getenv("SUPABASE_URL", "").rstrip("/") + "/rest/v1/chaves_usuario"
+def _conta_servico() -> dict | None:
+    bruto = (os.getenv("FIREBASE_SERVICE_ACCOUNT") or "").strip()
+    if not bruto:
+        return None
+    try:
+        d = json.loads(bruto)
+    except ValueError:
+        return None
+    return d if all(d.get(k) for k in ("client_email", "private_key", "project_id")) else None
+
+
+def _b64(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def _jwt_servico(d: dict) -> str:
+    agora = int(time.time())
+    cab = _b64(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
+    cor = _b64(json.dumps({
+        "iss": d["client_email"], "scope": "https://www.googleapis.com/auth/datastore",
+        "aud": "https://oauth2.googleapis.com/token", "iat": agora, "exp": agora + 3600,
+    }).encode())
+    chave = serialization.load_pem_private_key(d["private_key"].encode(), password=None)
+    assin = chave.sign(f"{cab}.{cor}".encode(), padding.PKCS1v15(), hashes.SHA256())
+    return f"{cab}.{cor}.{_b64(assin)}"
+
+
+async def _token_acesso(cli: httpx.AsyncClient, d: dict) -> str | None:
+    if _TOKEN["v"] and _TOKEN["exp"] > time.time() + 60:
+        return _TOKEN["v"]
+    r = await cli.post("https://oauth2.googleapis.com/token", data={
+        "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": _jwt_servico(d)})
+    if r.status_code != 200:
+        return None
+    j = r.json()
+    _TOKEN["v"], _TOKEN["exp"] = j.get("access_token"), time.time() + int(j.get("expires_in", 3000))
+    return _TOKEN["v"]
+
+
+def _doc_url(d: dict, sub: str) -> str:
+    return f"https://firestore.googleapis.com/v1/projects/{d['project_id']}/databases/(default)/documents/chaves_usuario/{sub}"
+
+
+async def _chamar(metodo: str, sub: str, corpo: dict | None = None):
+    d = _conta_servico()
+    if not d or not sub.isdigit():
+        return None
+    async with httpx.AsyncClient(timeout=10.0) as cli:
+        tk = await _token_acesso(cli, d)
+        if not tk:
+            return None
+        return await cli.request(metodo, _doc_url(d, sub), headers={"Authorization": f"Bearer {tk}"}, json=corpo)
 
 
 async def guardar_chave(sub: str, email: str, chave: str) -> bool:
     if not cofre_disponivel():
         return False
     try:
-        async with httpx.AsyncClient(timeout=10.0) as cli:
-            r = await cli.post(
-                _url(), params={"on_conflict": "sub"},
-                headers={**_cab(), "Prefer": "resolution=merge-duplicates"},
-                json={"sub": sub, "email": email, "chave_cifrada": cifrar(chave), "atualizado": datetime.now(timezone.utc).isoformat()},
-            )
-        return r.status_code in (200, 201, 204)
+        r = await _chamar("PATCH", sub, {"fields": {
+            "email": {"stringValue": email}, "chave_cifrada": {"stringValue": cifrar(chave)},
+            "atualizado": {"timestampValue": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}}})
+        return bool(r is not None and r.status_code == 200)
     except Exception:
         return False
 
@@ -123,20 +171,19 @@ async def buscar_chave(sub: str) -> str | None:
     if not cofre_disponivel():
         return None
     try:
-        async with httpx.AsyncClient(timeout=10.0) as cli:
-            r = await cli.get(_url(), params={"sub": f"eq.{sub}", "select": "chave_cifrada"}, headers=_cab())
-        linhas = r.json() if r.status_code == 200 else []
+        r = await _chamar("GET", sub)
+        if r is None or r.status_code != 200:
+            return None
+        return decifrar(r.json()["fields"]["chave_cifrada"]["stringValue"])
     except Exception:
         return None
-    return decifrar(linhas[0]["chave_cifrada"]) if linhas else None
 
 
 async def remover_chave(sub: str) -> bool:
     if not cofre_disponivel():
         return False
     try:
-        async with httpx.AsyncClient(timeout=10.0) as cli:
-            r = await cli.delete(_url(), params={"sub": f"eq.{sub}"}, headers=_cab())
-        return r.status_code in (200, 204)
+        r = await _chamar("DELETE", sub)
+        return bool(r is not None and r.status_code in (200, 404))
     except Exception:
         return False

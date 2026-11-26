@@ -24,4 +24,4 @@ Sem estas variáveis o app funciona normalmente, só sem login.
 |---|---|
 | `GOOGLE_CLIENT_ID` | ID do cliente OAuth (tipo "Aplicativo da Web") criado no Google Cloud. Em "Origens JavaScript autorizadas" coloque a URL do app. |
 | `SESSION_SECRET` | Texto aleatório com 24+ caracteres. Assina a sessão e deriva a criptografia das chaves. |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Onde as chaves (já criptografadas) ficam guardadas. Rode antes `db/chaves_usuario.sql`. |
+| `FIREBASE_SERVICE_ACCOUNT` | JSON inteiro da conta de serviço do Firebase (Configurações do projeto → Contas de serviço → Gerar nova chave privada). O Firestore (plano gratuito) guarda as chaves, já criptografadas, na coleção `chaves_usuario`. |

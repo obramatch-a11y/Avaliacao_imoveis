@@ -199,3 +199,43 @@ def test_login_google_rejeita_token_de_outro_app(monkeypatch):
     assert asyncio.run(conta.verificar_google("tok")) is None
     monkeypatch.setattr(httpx, "AsyncClient", falso({**bom, "email_verified": "false"}))
     assert asyncio.run(conta.verificar_google("tok")) is None
+
+
+def test_cofre_firestore(monkeypatch):
+    import asyncio
+    import json
+    import httpx
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from app import conta
+    pem = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT", json.dumps({"client_email": "x@p.iam.gserviceaccount.com", "private_key": pem, "project_id": "proj"}))
+    monkeypatch.setenv("SESSION_SECRET", "x" * 40)
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "id.apps.googleusercontent.com")
+    assert conta.cofre_disponivel()
+    assert conta._jwt_servico(conta._conta_servico()).count(".") == 2
+    banco = {}
+
+    class R:
+        def __init__(self, c, j=None): self.status_code, self._j = c, j or {}
+        def json(self): return self._j
+
+    class Cli:
+        def __init__(self, *a, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, url, **k): return R(200, {"access_token": "t", "expires_in": 3600})
+        async def request(self, metodo, url, headers=None, json=None):
+            assert headers["Authorization"] == "Bearer t" and "/chaves_usuario/123" in url
+            if metodo == "PATCH": banco["d"] = json; return R(200)
+            if metodo == "GET": return R(200, banco["d"]) if "d" in banco else R(404)
+            banco.pop("d", None); return R(200)
+
+    monkeypatch.setattr(httpx, "AsyncClient", Cli)
+    k = "0123456789abcdef0123456789abcdef"
+    assert asyncio.run(conta.guardar_chave("123", "a@b.c", k)) is True
+    assert k not in json.dumps(banco["d"])  # nunca vai em texto puro
+    assert asyncio.run(conta.buscar_chave("123")) == k
+    assert asyncio.run(conta.remover_chave("123")) is True and asyncio.run(conta.buscar_chave("123")) is None
+    assert asyncio.run(conta.guardar_chave("../x", "a", k)) is False
