@@ -203,6 +203,13 @@
     tbody tr.hl td { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
     td.n, th.n { text-align: right; }
     .tag { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+    .tag.val { background: var(--accent-bg, var(--ok-bg)); color: var(--ok); margin-left: 4px; }
+    tbody tr.edit td[data-f] strong, tbody tr.edit td[data-f] { text-decoration: underline dotted; text-underline-offset: 3px; }
+    .colsel { position: relative; } .colsel summary { list-style: none; cursor: pointer; } .colsel summary::-webkit-details-marker { display: none; }
+    .colpop { position: absolute; z-index: 30; right: 0; top: 44px; min-width: 200px; max-height: 320px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: 0 12px 30px rgba(0,0,0,.18); display: grid; gap: 2px; }
+    .colpop label { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 7px; font-size: 13px; cursor: pointer; } .colpop label:hover { background: var(--surface-3); }
+    .corr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; } .corr label { font-size: 11px; color: var(--muted); display: grid; gap: 3px; } .corr input { height: 34px; padding: 0 8px; width: 100%; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+    .log { margin: 6px 0 0; padding-left: 16px; font-size: 12px; color: var(--muted); }
     .tag.fora { background: var(--surface-3); color: var(--muted); }
     tbody tr.fora td { opacity: .62; }
     .tag.ok { background: var(--ok-bg); color: var(--ok); } .tag.warn { background: var(--warn-bg); color: var(--warn); }
@@ -497,6 +504,7 @@
           <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
             <input id="busca" type="search" placeholder="Buscar na tabela ( / )" aria-label="Buscar na tabela" /></div>
           <select id="fStatus" aria-label="Filtrar por status"><option value="">Compatíveis com os filtros</option><option value="ok">Somente sem alertas</option><option value="alerta">Somente com alertas</option><option value="fora">Fora dos filtros (auditoria)</option><option value="todos">Todos os coletados</option></select>
+          <details class="colsel" id="colsel"><summary class="btn" role="button" aria-label="Escolher colunas visíveis">Colunas</summary><div class="colpop" id="colpop"></div></details>
           <span class="chipf" id="chipBin" role="button" tabindex="0" aria-label="Limpar filtro do gráfico">Faixa do gráfico ✕</span>
           <span class="grow"></span><span class="muted num" id="contagem"></span>
           <span class="vw" role="group" aria-label="Modo de visualização"><button type="button" id="vTab" aria-pressed="true">Tabela</button><button type="button" id="vGal" aria-pressed="false">Galeria</button></span>
@@ -818,7 +826,7 @@
       var fora = rows.filter(function (r) { return r.st === "fora"; }).length, compat = rows.length - fora;
       $("#k-de").textContent = "de " + compat + " compatíveis com os filtros";
       var dup = rows.filter(function (r) { return r.dup; }).length, inc = rows.filter(function (r) { return r.inc; }).length, fts = {}; rows.forEach(function (r) { fts[r.fonte] = (fts[r.fonte] || 0) + 1; });
-      $("#qline").innerHTML = '<span class="pill">' + rows.length + ' coletados</span><span class="pill' + (fora ? " w" : "") + '">' + fora + ' fora dos filtros</span><span class="pill">' + (compat - n) + (compat - n === 1 ? " não selecionada" : " não selecionadas") + '</span><span class="pill' + (dup ? " w" : "") + '">' + dup + (dup === 1 ? " possível duplicidade" : " possíveis duplicidades") + '</span><span class="pill' + (inc ? " w" : "") + '">' + inc + (inc === 1 ? " com dado incompleto" : " com dados incompletos") + '</span>' +
+      $("#qline").innerHTML = '<span class="pill">' + rows.length + ' coletados</span><span class="pill">' + rows.filter(function (r) { return VALID[chave(r)]; }).length + ' validadas pelo avaliador</span><span class="pill' + (fora ? " w" : "") + '">' + fora + ' fora dos filtros</span><span class="pill">' + (compat - n) + (compat - n === 1 ? " não selecionada" : " não selecionadas") + '</span><span class="pill' + (dup ? " w" : "") + '">' + dup + (dup === 1 ? " possível duplicidade" : " possíveis duplicidades") + '</span><span class="pill' + (inc ? " w" : "") + '">' + inc + (inc === 1 ? " com dado incompleto" : " com dados incompletos") + '</span>' +
         Object.keys(fts).map(function (k) { return '<span class="pill">' + esc(k) + ": " + fts[k] + "</span>"; }).join("");
       $("#fCmp").textContent = "Comparar (" + CMP.length + ")";
     }
@@ -892,6 +900,57 @@
 
     /* ---------- Inspetor contextual ---------- */
     function linhaQ(nome, n, tot) { var p = tot ? n / tot * 100 : 0; return '<div class="qrow"><span>' + nome + '</span><span class="num">' + n + "/" + tot + '</span></div><div class="bar-q"><i style="width:' + p + '%"></i></div>'; }
+    /* ---------- Correções do avaliador, validação e colunas ---------- */
+    function lerLS(k, pad) { try { return JSON.parse(localStorage.getItem(k) || pad); } catch (e) { return JSON.parse(pad); } }
+    var EDIT = lerLS("ie-edit", "{}"), VALID = lerLS("ie-val", "{}"), LOG = lerLS("ie-log", "[]"), ORIG = {};
+    var CAMPOS_ED = { valor: "Valor", area: "Área", q: "Quartos" };
+    function registrar(r, campo, de, para) { LOG.unshift({ k: chave(r), campo: campo, de: de, para: para, t: new Date().toISOString() }); if (LOG.length > 300) LOG.length = 300; gravar("ie-log", LOG); }
+    function pintarLinha(r) {
+      var c = r.el.children, e = EDIT[chave(r)];
+      if (!ORIG[r.id]) ORIG[r.id] = { valor: r.valor, area: r.area, q: r.q };
+      var o = ORIG[r.id]; r.valor = o.valor; r.area = o.area; r.q = o.q;
+      if (e) Object.keys(CAMPOS_ED).forEach(function (k) { if (k in e) r[k] = e[k]; });
+      r.m2 = r.valor != null && r.area ? Math.round(r.valor / r.area * 100) / 100 : null;
+      var sv = c[4].querySelector("strong") || c[4]; sv.textContent = r.valor != null ? nf0.format(r.valor) : "–";
+      c[5].textContent = r.area != null ? nf2.format(r.area) : "–"; c[6].textContent = r.m2 != null ? nf0.format(r.m2) : "–"; c[7].textContent = r.q != null ? r.q : "–";
+      r.el.classList.toggle("edit", !!e); r.el.title = e ? "Valores corrigidos pelo avaliador (original preservado no histórico)" : "";
+      var t = c[2].querySelector(".tagv"); if (t) t.remove();
+      if (VALID[chave(r)]) { t = document.createElement("span"); t.className = "tag val tagv"; t.textContent = "✓ Validada"; c[2].appendChild(t); }
+    }
+    function corrigir(r, novo) {
+      var k = chave(r), e = EDIT[k] || {}, o = ORIG[r.id], mudou = false;
+      Object.keys(CAMPOS_ED).forEach(function (f) { var antes = f in e ? e[f] : o[f]; if (novo[f] !== antes) { registrar(r, CAMPOS_ED[f], antes, novo[f]); mudou = true; } e[f] = novo[f]; });
+      if (!mudou) return toast("Nada mudou");
+      EDIT[k] = e; gravar("ie-edit", EDIT); pintarLinha(r); atualizar(); toast("Correção salva · original preservado no histórico");
+    }
+    function restaurarOriginal(r) { var k = chave(r); if (!EDIT[k]) return; registrar(r, "Restaurado ao original", "", ""); delete EDIT[k]; gravar("ie-edit", EDIT); pintarLinha(r); atualizar(); toast("Valores originais restaurados"); }
+    function fmtLog(v) { return v == null ? "vazio" : nf2.format(v); }
+    function blocoCorrecao(r) {
+      var h = '<h3>Corrigir dados</h3><div class="box"><p class="note g" style="margin:0">Use quando o anúncio estiver certo e a coleta errada. O original fica guardado.</p><div class="corr">' +
+        '<label>Valor (R$)<input id="iEV" inputmode="decimal" value="' + (r.valor != null ? r.valor : "") + '"></label><label>Área (m²)<input id="iEA" inputmode="decimal" value="' + (r.area != null ? r.area : "") + '"></label><label>Quartos<input id="iEQ" inputmode="numeric" value="' + (r.q != null ? r.q : "") + '"></label></div>' +
+        '<p style="margin:8px 0 0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="iSalvar">Salvar correção</button>' + (EDIT[chave(r)] ? '<button class="btn" type="button" id="iRest">Restaurar original</button>' : "") + '</p>' +
+        '<label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px"><input type="checkbox" id="iVal"' + (VALID[chave(r)] ? " checked" : "") + '> Validada pelo avaliador</label>';
+      var meu = LOG.filter(function (l) { return l.k === chave(r); }).slice(0, 6);
+      if (meu.length) h += '<ul class="log">' + meu.map(function (l) { return "<li>" + new Date(l.t).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) + " · " + esc(l.campo) + (l.de === "" ? "" : ": " + fmtLog(l.de) + " → " + fmtLog(l.para)) + "</li>"; }).join("") + "</ul>";
+      return h + "</div>";
+    }
+    function ligarCorrecao(r) {
+      var b = $("#iSalvar"); if (!b) return;
+      function n(id) { var v = $(id).value.trim().replace(/\./g, "").replace(",", "."); if (v === "") return null; var x = Number(v); return isFinite(x) && x >= 0 ? x : undefined; }
+      b.addEventListener("click", function () { var v = n("#iEV"), a = n("#iEA"), q = n("#iEQ"); if (v === undefined || a === undefined || q === undefined) return toast("Use apenas números"); corrigir(r, { valor: v, area: a, q: q }); });
+      var rb = $("#iRest"); if (rb) rb.addEventListener("click", function () { restaurarOriginal(r); });
+      $("#iVal").addEventListener("change", function () { var k = chave(r); if (this.checked) VALID[k] = 1; else delete VALID[k]; gravar("ie-val", VALID); registrar(r, this.checked ? "Validada pelo avaliador" : "Validação removida", "", ""); pintarLinha(r); kpis(); });
+    }
+    function correcoesParaExportar() { var o = {}; rows.forEach(function (r) { var e = EDIT[chave(r)]; if (e) o[r.id] = e; }); return JSON.stringify(o); }
+    function iniciarColunas() {
+      var pop = $("#colpop"); if (!pop || !tab) return; var ths = $$("thead th", tab), oculto = lerLS("ie-cols", "[]"), st = document.createElement("style"); document.head.appendChild(st);
+      function css() { st.textContent = oculto.map(function (i) { return "#tab th:nth-child(" + (i + 1) + "),#tab td:nth-child(" + (i + 1) + "){display:none!important}"; }).join(""); gravar("ie-cols", oculto); }
+      ths.forEach(function (th, i) { if (i < 2) return; var nome = th.textContent.trim() || "Coluna", l = document.createElement("label"), c = document.createElement("input"); c.type = "checkbox"; c.checked = oculto.indexOf(i) < 0;
+        c.addEventListener("change", function () { var j = oculto.indexOf(i); if (c.checked && j > -1) oculto.splice(j, 1); else if (!c.checked && j < 0) oculto.push(i); css(); }); l.appendChild(c); l.appendChild(document.createTextNode(nome)); pop.appendChild(l); });
+      css(); document.addEventListener("click", function (e) { var d = $("#colsel"); if (d && d.open && !d.contains(e.target)) d.open = false; });
+    }
+    function iniciarCorrecoes() { rows.forEach(pintarLinha); iniciarColunas(); var fe = $("#formExport"); if (fe) fe.addEventListener("submit", function () { var h = $("#correcoes"); if (!h) { h = document.createElement("input"); h.type = "hidden"; h.name = "correcoes"; h.id = "correcoes"; fe.appendChild(h); } h.value = correcoesParaExportar(); }); }
+
     function inspetor() {
       var el = $("#inspBody"); if (!el) return; var V = VARS[varAtual], u = emUso(), S = stats(u.map(function (r) { return r[varAtual]; }).filter(function (x) { return x != null; })), h = "";
       if (sel) {
@@ -900,7 +959,7 @@
           "</dd><dt>Área</dt><dd>" + (sel.area != null ? nf2.format(sel.area) + " m²" : "–") + "</dd><dt>R$/m²</dt><dd>" + (x != null ? "R$ " + nf0.format(x) : "–") + "</dd><dt>Quartos · Vagas</dt><dd>" + (sel.q != null ? sel.q : "–") + " · " + (sel.vagas != null ? sel.vagas : "–") + "</dd><dt>Status</dt><dd>" + esc(sel.st === "fora" ? "fora dos filtros" : sel.st === "ok" ? "compatível" : "com alerta") + "</dd></dl>";
         if (S2 && x != null && S2.n > 1) h += '<p class="note">Posição na amostra em uso: <b>percentil ' + nf0.format(perc) + "</b> · " + (x >= S2.med ? "+" : "") + nf0.format((x / S2.med - 1) * 100) + "% da mediana" + (S2.sd ? " · z = " + nf2.format((x - S2.mean) / S2.sd) : "") + ".</p>";
         if (sel.mot && sel.mot.length) h += '<p class="note"><b>Por que o alerta:</b></p><ul class="note" style="margin:2px 0 0;padding-left:18px">' + sel.mot.map(function (m) { return "<li>" + esc(m) + "</li>"; }).join("") + '</ul><p class="note">Nada foi excluído: você decide se este imóvel entra na amostra.</p>';
-        h += '<p style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap">' + (sel.url ? '<a class="btn" href="' + esc(sel.url) + '" target="_blank" rel="noopener noreferrer">Abrir anúncio ↗</a>' : "") + '<button class="btn" type="button" id="iUsar">' + (sel.cb.checked ? "Retirar da amostra" : "Usar na amostra") + '</button><button class="btn" type="button" id="iCmp">' + (CMP.indexOf(sel) > -1 ? "Remover da comparação" : "Comparar") + '</button><button class="btn" type="button" id="iFechar">Limpar</button></p></div>';
+        h += '<p style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap">' + (sel.url ? '<a class="btn" href="' + esc(sel.url) + '" target="_blank" rel="noopener noreferrer">Abrir anúncio ↗</a>' : "") + '<button class="btn" type="button" id="iUsar">' + (sel.cb.checked ? "Retirar da amostra" : "Usar na amostra") + '</button><button class="btn" type="button" id="iCmp">' + (CMP.indexOf(sel) > -1 ? "Remover da comparação" : "Comparar") + '</button><button class="btn" type="button" id="iFechar">Limpar</button></p></div>' + blocoCorrecao(sel);
       }
       h += "<h3>Estatísticas · " + V.nome + '</h3><div class="box">';
       if (S) { h += "<dl><dt>n</dt><dd>" + S.n + "</dd><dt>Mínimo</dt><dd>" + V.f.format(S.min) + "</dd><dt>1º quartil</dt><dd>" + V.f.format(S.q1) + "</dd><dt>Mediana</dt><dd>" + V.f.format(S.med) + "</dd><dt>3º quartil</dt><dd>" + V.f.format(S.q3) + "</dd><dt>Máximo</dt><dd>" + V.f.format(S.max) +
@@ -911,6 +970,7 @@
         linhaQ("Quartos informados", rows.filter(function (r) { return r.q != null; }).length, rows.length) + linhaQ("Bairro identificado", rows.filter(function (r) { return r.bairro !== "NAO_INFORMADO"; }).length, rows.length) +
         linhaQ("Sem alerta de outlier", rows.filter(function (r) { return r.st === "ok"; }).length, rows.length) + '<p class="note g">Campos vazios reduzem o que pode ser usado depois na modelagem. O andar não aparece nos cartões do portal.</p></div>';
       el.innerHTML = h; var u1 = $("#iUsar"), u2 = $("#iFechar"), u3 = $("#iCmp"); if (u3) u3.addEventListener("click", function () { alternaCmp(sel); });
+      if (sel) ligarCorrecao(sel);
       if (u1) u1.addEventListener("click", function () { empilhar(); sel.cb.checked = !sel.cb.checked; atualizar(); });
       if (u2) u2.addEventListener("click", function () { selecionar(null); });
     }
@@ -940,6 +1000,7 @@
     function copiar() { var u = emUso(), t = ["Bairro\tValor (R$)\tÁrea (m²)\tR$/m²\tQuartos\tVagas\tLink"].concat(u.map(function (r) { return [r.bairro, r.valor, r.area, r.m2, r.q, r.vagas, r.url].map(function (v) { return v == null ? "" : String(v).replace(".", ","); }).join("\t"); })).join("\n");
       (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast(u.length + " amostras copiadas (cole numa planilha)"); }, function () { toast("Não foi possível copiar neste navegador"); }); }
     if (tab) {
+      iniciarCorrecoes();
       tbody.addEventListener("click", function (e) { if (e.target.closest("a,input")) return; var tr = e.target.closest("tr"); if (!tr) return; var r = rows.filter(function (x) { return x.el === tr; })[0]; selecionar(sel === r ? null : r); });
       tbody.addEventListener("change", function (e) { if (e.target.type === "checkbox") atualizar(); });
       tbody.addEventListener("mousedown", function (e) { if (e.target.type === "checkbox") empilhar(); });

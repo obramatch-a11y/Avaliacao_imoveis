@@ -1,3 +1,4 @@
+import json
 from fastapi.responses import JSONResponse
 from datetime import datetime
 from typing import Optional
@@ -305,14 +306,44 @@ async def fotos_amostra(id_amostra: int):
     return {"fotos": fotos}
 
 
+def aplicar_correcoes(amostras: list[AmostraMercado], bruto: str) -> None:
+    """Aplica as correções feitas pelo avaliador na tela (valor, área, quartos) antes de exportar."""
+    try:
+        dados = json.loads(bruto) if bruto else {}
+    except ValueError:
+        return
+    if not isinstance(dados, dict):
+        return
+    for a in amostras:
+        c = dados.get(str(a.id_amostra))
+        if not isinstance(c, dict):
+            continue
+
+        def num(x):
+            return float(x) if isinstance(x, (int, float)) and not isinstance(x, bool) and x >= 0 else None
+
+        if "valor" in c:
+            a.valor_oferta = num(c["valor"])
+        if "area" in c:
+            a.area_m2 = num(c["area"])
+        if "q" in c:
+            q = num(c["q"])
+            a.quartos = int(q) if q is not None else None
+        a.valor_m2 = round(a.valor_oferta / a.area_m2, 2) if a.valor_oferta and a.area_m2 else None
+
+
 @app.post("/exportar-csv")
 async def exportar_csv(
     ids_selecionados: list[int] = Form(default=[]),
     modo: str = Form(default="completo"),
+    correcoes: str = Form(default=""),
 ):
     selecionadas = [
-        a for a in ULTIMA_COLETA if not ids_selecionados or a.id_amostra in ids_selecionados
+        a.model_copy(deep=True)
+        for a in ULTIMA_COLETA
+        if not ids_selecionados or a.id_amostra in ids_selecionados
     ]
+    aplicar_correcoes(selecionadas, correcoes)
     apenas_numericas = modo == "numerico"
     conteudo_csv = gerar_csv(selecionadas, apenas_numericas=apenas_numericas)
 

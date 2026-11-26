@@ -106,3 +106,13 @@ def test_filtros_validados_no_backend_exemplos_do_relatorio():
     assert [a.fora_filtros for a in r] == [True, True, True, True, True, False]
     assert any("Área abaixo" in m for m in r[2].motivos) and any("Valor baixo demais" in m for m in r[0].motivos)
     assert r[5].motivos == [] and r[5].completude == 4
+
+
+def test_correcoes_do_avaliador_na_exportacao():
+    from app.main import aplicar_correcoes, normalizar_lista
+    from app.models import BuscaImovelInput
+    p = BuscaImovelInput(uf="PE", cidade="Recife", finalidade="VENDA", tipo_imovel="APARTAMENTO")
+    r = normalizar_lista([{"fonte": "OLX", "titulo": "A", "preco": "R$ 450.000", "area": "80", "quartos": "2", "bairro": "Boa Viagem", "url": "https://x/1"}], p)
+    aplicar_correcoes(r, '{"1": {"valor": 480000, "area": 100, "q": 3}}')
+    assert (r[0].valor_oferta, r[0].area_m2, r[0].quartos, r[0].valor_m2) == (480000.0, 100.0, 3, 4800.0)
+    aplicar_correcoes(r, "lixo")
