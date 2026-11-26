@@ -104,6 +104,15 @@ _TOKEN: dict = {"v": None, "exp": 0.0}
 def _conta_servico() -> dict | None:
     bruto = (os.getenv("FIREBASE_SERVICE_ACCOUNT") or "").strip()
     if not bruto:
+        # Alternativa: "Secret File" do Render (arquivo firebase.json), sem precisar abrir ou copiar o conteúdo
+        for caminho in (os.getenv("FIREBASE_SERVICE_ACCOUNT_FILE") or "", "/etc/secrets/firebase.json"):
+            try:
+                if caminho and os.path.isfile(caminho):
+                    bruto = open(caminho, encoding="utf-8").read().strip()
+                    break
+            except OSError:
+                continue
+    if not bruto:
         return None
     try:
         d = json.loads(bruto)

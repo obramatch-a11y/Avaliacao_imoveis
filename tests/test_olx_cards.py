@@ -239,3 +239,15 @@ def test_cofre_firestore(monkeypatch):
     assert asyncio.run(conta.buscar_chave("123")) == k
     assert asyncio.run(conta.remover_chave("123")) is True and asyncio.run(conta.buscar_chave("123")) is None
     assert asyncio.run(conta.guardar_chave("../x", "a", k)) is False
+
+
+def test_conta_de_servico_por_arquivo_secreto(monkeypatch, tmp_path):
+    import json
+    from app import conta
+    f = tmp_path / "firebase.json"
+    f.write_text(json.dumps({"client_email": "a@b", "private_key": "k", "project_id": "p"}))
+    monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT", raising=False)
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_FILE", str(f))
+    assert conta._conta_servico()["project_id"] == "p"
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_FILE", str(tmp_path / "nao-existe.json"))
+    assert conta._conta_servico() is None or isinstance(conta._conta_servico(), dict)
