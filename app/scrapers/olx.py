@@ -15,11 +15,8 @@ class OLXScraper(BaseScraper):
     nome_fonte = "OLX"
 
     HEADERS = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Safari/537.36"
-        ),
+        # Identidade honesta: não nos passamos por navegador.
+        "User-Agent": "InferenciaEstatistica/1.0 (+https://avaliacao-imoveis-j39l.onrender.com; coleta de amostras para avaliacao imobiliaria)",
         "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     }
@@ -113,6 +110,42 @@ class OLXScraper(BaseScraper):
         if params.bairro and bairro and bairro != self._slug(params.bairro):
             return False
         return True
+
+    def _extrair_de_flight(self, html: str) -> list[dict]:
+        """Extrator atual da OLX (páginas Next.js 'app router'): usa as funções puras do projeto olx-brazil-scraper
+        (MIT, ver app/vendor/olx_brazil/NOTICE.md). Se o formato mudar e nada for lido, devolve [] e os extratores
+        antigos entram como reserva."""
+        try:
+            from app.vendor.olx_brazil import parsers
+            cartoes = parsers.parse_listing(html).get("results") or []
+        except Exception:  # noqa: BLE001
+            return []
+        itens: list[dict] = []
+        for c in cartoes:
+            attrs = {a.get("name"): a for a in (c.get("attributes") or []) if isinstance(a, dict)}
+            loc = c.get("location") or {}
+            preco = (c.get("price") or {}).get("text") or ""
+            area = attrs.get("size") or {}
+            fotos = []
+            for u in (c.get("images") or [])[:3]:
+                if isinstance(u, str):
+                    fotos.append(u.replace("/images/", "/thumbs700x500/", 1) if "/images/" in u else u)
+            recursos = (attrs.get("re_features") or {}).get("value") or ""
+            tipo = (attrs.get("real_estate_type") or {}).get("value") or ""
+            titulo = c.get("title") or ""
+            itens.append({
+                "fonte": self.nome_fonte, "titulo": titulo, "preco": preco,
+                "bairro": loc.get("neighbourhood") or "", "cidade_origem": loc.get("municipality") or "",
+                "area": str(area.get("value") or ""), "tipo_area": str(area.get("label") or ""),
+                "quartos": str((attrs.get("rooms") or {}).get("value") or ""),
+                "banheiros": str((attrs.get("bathrooms") or {}).get("value") or ""),
+                "vagas": str((attrs.get("garage_spaces") or {}).get("value") or ""),
+                "condominio": "", "iptu": "",
+                "detalhes": " ".join(x for x in (titulo, tipo, recursos, loc.get("text") or "", preco) if x),
+                "descricao": "", "url": c.get("link") or "", "fotos": fotos,
+                "latitude": "", "longitude": "",
+            })
+        return itens
 
     def _extrair_de_next_data(self, soup: BeautifulSoup) -> list[dict]:
         script = soup.find("script", id="__NEXT_DATA__")
@@ -309,12 +342,15 @@ class OLXScraper(BaseScraper):
                     itens: list[dict] = []
                     self.debug["urls"].append(url)
                     if resp.status_code == 200:
-                        soup = BeautifulSoup(resp.text, "lxml")
-                        itens = self._extrair_de_next_data(soup)
-                        parser = "next_data"
+                        itens = self._extrair_de_flight(resp.text)
+                        parser = "flight_omkarcloud"
                         if not itens:
-                            itens = self._extrair_de_html_cards(soup)
-                            parser = "html_cards"
+                            soup = BeautifulSoup(resp.text, "lxml")
+                            itens = self._extrair_de_next_data(soup)
+                            parser = "next_data"
+                            if not itens:
+                                itens = self._extrair_de_html_cards(soup)
+                                parser = "html_cards"
                         self.debug["parser"].append(f"pagina {pagina}: {parser} ({len(itens)} itens)")
                         if not self.debug["amostra_bruta"]:
                             self.debug["amostra_bruta"] = itens[:3]

@@ -433,6 +433,7 @@
                 <input id="pmax" type="number" step="1000" name="preco_max" placeholder="600000" inputmode="numeric" value="{{ filtros.get('preco_max') | int if filtros.get('preco_max') else '' }}" /></div>
               <fieldset class="f" style="grid-column:1/-1;border:0;padding:0;margin:0;display:flex;gap:16px;flex-wrap:wrap;align-items:center"><legend class="sr">Fontes</legend>
                 <span style="font-size:12px;font-weight:600;color:var(--muted)">Fontes:</span>
+                <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="fonteTodas" checked> Todas as fontes</label>
                 <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="checkbox" name="fontes" value="olx" checked> OLX</label>
                 <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="checkbox" name="fontes" value="chaves" checked> Chaves na Mão</label>
                 <span class="pill" id="chStatus" style="margin-left:auto">Importação da OLX: verificando…</span>
@@ -755,7 +756,7 @@
     function chCarregarAuth() { fetch("/auth/config").then(function (r) { return r.json(); }).then(function (j) { AUTH = { login: !!j.login, usuario: j.usuario, tem_chave: !!j.tem_chave, cofre: !!j.cofre }; chTela(); chStatus(); if (AUTH.login && !AUTH.usuario) chIniciarGoogle(j.client_id); }).catch(function () {}); }
     chCarregarAuth();
     $("#chSair").addEventListener("click", function () { fetch("/auth/sair", { method: "POST" }).then(function () { AUTH.usuario = null; AUTH.tem_chave = false; chTela(); chStatus(); chCarregarAuth(); chMsg("Você saiu da conta."); }); });
-    function chStatus() { var el = $("#chStatus"), ok = temLiberacao(); el.textContent = ok ? "Importação da OLX: liberada ✓" : (canalServidor ? "Importação da OLX: canal do servidor" : (AUTH.login && !AUTH.usuario ? "Importação da OLX: entre com Google" : "Importação da OLX: precisa liberar")); el.classList.toggle("w", !ok && !canalServidor); $("#chRemover").hidden = !ok; if (AUTH.usuario) $("#chAbrirDlg").textContent = ok ? "Trocar chave" : "Liberar importação"; $("#chAbrirDlg").textContent = ok ? "Trocar chave" : "Liberar importação"; }
+    function chStatus() { var el = $("#chStatus"), ok = temLiberacao(); el.textContent = ok ? "Importação da OLX: liberada ✓" : (canalServidor ? "Importação da OLX: canal do servidor" : "OLX: direta (chave opcional)"); el.classList.toggle("w", false); $("#chRemover").hidden = !ok; if (AUTH.usuario) $("#chAbrirDlg").textContent = ok ? "Trocar chave" : "Liberar importação"; $("#chAbrirDlg").textContent = ok ? "Trocar chave" : "Liberar importação"; }
     fetch("/canal").then(function (r) { return r.json(); }).then(function (j) { canalServidor = !!j.servidor; chStatus(); }).catch(function () { chStatus(); }); chStatus();
     function chMsg(t, erro) { var m = $("#chMsg"); m.textContent = t; m.style.color = erro ? "var(--bad, #b3261e)" : "var(--ok)"; }
     function chValidar(texto) {
@@ -779,7 +780,7 @@
       if (!window.fetch || !window.FormData) { document.body.classList.add("loading"); return; }
       e.preventDefault();
       var temOlx = $$('input[name="fontes"]:checked', form).some(function (c) { return c.value === "olx"; });
-      if (temOlx && !temLiberacao() && !canalServidor) { chMsg(AUTH.login && !AUTH.usuario ? "Para importar da OLX, entre com sua conta Google e libere a importação." : "Para importar da OLX, libere a importação primeiro."); dlgC.showModal(); return; } guardarRecente(); var b = $("#btnBuscar"); b.classList.add("busy"); b.disabled = true; $("#btnTxt").textContent = "Coletando…";
+      /* A OLX é tentada direto, sem chave. A chave pessoal do ScrapingAnt continua opcional, como reforço quando a OLX bloqueia o servidor. */ guardarRecente(); var b = $("#btnBuscar"); b.classList.add("busy"); b.disabled = true; $("#btnTxt").textContent = "Coletando…";
       $$("#kpis, #sec-graf, #sec-tab").forEach(function (el) { el.style.display = "none"; }); $("#sec-param").classList.remove("open");
       var pr = $("#prog"); pr.classList.add("on"); $("#progX").hidden = false; $("#progX").disabled = false; $("#progT").textContent = "Iniciando coleta…"; $("#progD").textContent = ""; $("#progL").textContent = ""; $("#progB").style.width = "4%";
       fetch("/coleta", { method: "POST", body: (function () { var fd = new FormData(form); if (CHAVE) fd.append("chave", CHAVE); return fd; })() }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
@@ -1169,6 +1170,15 @@
 
     if (tab) { $("#vTab").addEventListener("click", function () { modo("tabela"); }); $("#vGal").addEventListener("click", function () { modo("galeria"); }); pintarFotos(); modo(prefs.vista === "galeria" ? "galeria" : "tabela"); ordenar(); kpis(); desenhar(); inspetor(); filtrar(); }
   })();
-  </script>
+  
+    (function () {
+      var todas = document.getElementById("fonteTodas"), caixas = Array.prototype.slice.call(document.querySelectorAll('input[name="fontes"]'));
+      if (!todas) return;
+      function sincroniza() { todas.checked = caixas.length > 0 && caixas.every(function (c) { return c.checked; }); }
+      todas.addEventListener("change", function () { caixas.forEach(function (c) { c.checked = todas.checked; }); });
+      caixas.forEach(function (c) { c.addEventListener("change", sincroniza); });
+      sincroniza();
+    })();
+</script>
 </body>
 </html>

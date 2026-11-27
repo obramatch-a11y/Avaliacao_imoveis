@@ -13,10 +13,10 @@ from app.exporter import gerar_csv
 from app.models import AmostraMercado, BuscaImovelInput
 from app.normalizer import normalizar_registro_bruto
 from app.qualidade import avaliar
-from app.scrapers.chaves import ChavesNaMaoScraper
+from app.scrapers.chaves_mcp import ChavesNaMaoMCPScraper
 from app.scrapers.olx import OLXScraper
 
-FONTES = {"olx": OLXScraper, "chaves": ChavesNaMaoScraper}
+FONTES = {"olx": OLXScraper, "chaves": ChavesNaMaoMCPScraper}
 
 
 async def coletar_fontes(params, fontes, ao_progredir=None, cancelado=None, chave_api=None):
@@ -161,10 +161,15 @@ def normalizar_lista(brutos: list[dict], params: BuscaImovelInput) -> list[Amost
         amostra.fora_filtros, amostra.motivos, amostra.completude = avaliar(
             amostra, params, f"{item.get('titulo', '')} {item.get('detalhes', '')}"
         )
-        assinatura = (amostra.bairro.lower(), amostra.area_m2, amostra.valor_oferta, amostra.quartos)
-        if assinatura in vistos_assinatura:
+        # Duplicidade: mesmo endereço do anúncio, ou mesma combinação bairro+área+preço+quartos (só quando há área e preço)
+        chaves_dup = []
+        if amostra.url_anuncio:
+            chaves_dup.append(("url", amostra.url_anuncio.split("?")[0].rstrip("/")))
+        if amostra.area_m2 and amostra.valor_oferta and amostra.bairro != "NAO_INFORMADO":
+            chaves_dup.append(("sig", amostra.bairro.lower(), amostra.area_m2, amostra.valor_oferta, amostra.quartos))
+        if any(k in vistos_assinatura for k in chaves_dup):
             continue
-        vistos_assinatura.add(assinatura)
+        vistos_assinatura.update(chaves_dup)
         normalizados.append(amostra)
     return normalizados
 
@@ -347,6 +352,36 @@ async def diagnostico_fontes(uf: str = "PE", cidade: str = "Recife", tipo_imovel
     res = await diagnosticar_fontes(params)
     c.update({"res": res, "chave": chave, "t": _t.time()})
     return JSONResponse(res)
+
+
+_VALIDACAO: dict = {"estado": "ocioso"}
+
+
+@app.get("/validacao-nacional")
+async def validacao_nacional(iniciar: int = 0, cidades: str = "", tipo_imovel: str = "APARTAMENTO", finalidade: str = "VENDA", paginas: int = 2):
+    """Validação medida em várias cidades (fonte Chaves na Mão via MCP oficial). `?iniciar=1` dispara em segundo plano;
+    sem parâmetro mostra o andamento/resultado. Formato de `cidades`: "Manaus-AM;Recife-PE"."""
+    import asyncio
+    import time as _t
+    from app.validacao import CIDADES_PADRAO, validar
+
+    if iniciar:
+        if _VALIDACAO.get("estado") == "rodando":
+            return JSONResponse({**_VALIDACAO, "aviso": "já em andamento"})
+        if _VALIDACAO.get("estado") == "concluido" and _t.time() - _VALIDACAO.get("inicio", 0) < 300:
+            return JSONResponse({**_VALIDACAO, "aviso": "resultado recente mantido por 5 minutos"})
+        lista = []
+        if cidades.strip():
+            for par in cidades.split(";"):
+                nome, _, uf = par.strip().rpartition("-")
+                if re.fullmatch(r"[A-Za-z]{2}", uf) and 2 <= len(nome) <= 60:
+                    lista.append((uf.upper(), nome.strip()))
+        lista = (lista or CIDADES_PADRAO)[:14]
+        if tipo_imovel not in ("APARTAMENTO", "CASA", "TERRENO", "COMERCIAL") or finalidade not in ("VENDA", "LOCACAO"):
+            return JSONResponse({"erro": "parâmetros inválidos"}, status_code=400)
+        _VALIDACAO.clear()
+        _VALIDACAO["tarefa"] = asyncio.create_task(validar(_VALIDACAO, lista, tipo_imovel, finalidade, max(1, min(paginas, 5))))
+    return JSONResponse({k: v for k, v in _VALIDACAO.items() if k != "tarefa"})
 
 
 @app.get("/buscar")

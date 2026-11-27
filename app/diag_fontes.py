@@ -213,6 +213,47 @@ def _pular(motivo: str, robots: dict | None = None) -> dict:
     return {"classificacao": ROBOTS_PROIBE, "motivo": motivo, "robots": rb}
 
 
+# ---- Chaves na Mão: servidor MCP oficial -------------------------------------------------------
+
+async def sonda_chaves_mcp(client: httpx.AsyncClient, params: BuscaImovelInput, robots_cache: dict) -> dict:
+    from app.scrapers.chaves_mcp import MCP_URL, ClienteMCP, MCPErro, filtros_do_pedido, itens_do_resultado
+    from app.validacao import cobertura_percentual
+
+    rb = await checar_robots(client, MCP_URL, robots_cache)
+    if not rb["permitido"]:
+        return _pular("robots.txt não permite este endereço ao nosso agente", rb)
+    m = Medidor()
+    out: dict = {"url": MCP_URL, "robots": {k: rb[k] for k in ("permitido", "estado_robots")}}
+    mcp = ClienteMCP(client)
+    try:
+        try:
+            srv = await mcp.iniciar()
+            out["initialize"] = {"servidor": srv.get("serverInfo"), "protocolo": srv.get("protocolVersion"),
+                                 "capacidades": list((srv.get("capabilities") or {}).keys()), "sessao": bool(mcp.sessao)}
+        except MCPErro as e:
+            out["initialize"] = {"erro": str(e), "categoria": e.categoria}
+            if e.categoria in ("conexao", "bloqueio"):
+                raise
+        ferramentas = await mcp.listar_ferramentas()
+        out["ferramentas"] = [f.get("name") for f in ferramentas]
+        busca = next((f for f in ferramentas if f.get("name") == "search_realty_listings"), None)
+        out["esquema_search_realty_listings"] = json.dumps((busca or {}).get("inputSchema"), ensure_ascii=False)[:2500] if busca else None
+        r = await mcp.chamar("search_realty_listings", {"filters": filtros_do_pedido(params), "page": 1, "pageSize": 20})
+        itens, total, formato = itens_do_resultado(r)
+        textos = [c.get("text", "") for c in (r.get("content") or []) if isinstance(c, dict)]
+        out.update({
+            "chaves_do_resultado": sorted(r.keys()), "formato_lido": formato, "total_declarado": total,
+            "anuncios_lidos": len(itens), "cobertura_campos_pct": cobertura_percentual(itens),
+            "primeiro_anuncio": itens[0] if itens else None, "amostra_bruta": ("\n".join(textos))[:700],
+        })
+        out["classificacao"] = classificar(200, None, [], len(itens), total)
+    except MCPErro as e:
+        out["erro"] = str(e)
+        out["classificacao"] = {"conexao": FALHA_CONEXAO, "bloqueio": BLOQUEIO, "http": ERRO_HTTP}.get(e.categoria, ERRO_EXTRACAO)
+    out.update(m.fechar())
+    return out
+
+
 # ---- Chaves na Mão: endpoint oficial para agentes ---------------------------------------------
 
 def ler_markdown_chaves(texto: str) -> dict:
@@ -457,6 +498,7 @@ async def diagnosticar_fontes(params: BuscaImovelInput, transporte: httpx.AsyncB
             resultado["fontes"][nome] = r
             return r
 
+        await rodar("chaves_mcp", sonda_chaves_mcp(client, params, robots_cache))
         busca = await rodar("chaves_busca_oficial", sonda_chaves_busca(client, params, robots_cache))
         urls = (busca or {}).pop("_urls", []) if busca else []
         await rodar("chaves_sitemap", sonda_chaves_sitemap(client, robots_cache))
