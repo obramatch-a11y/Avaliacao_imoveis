@@ -13,7 +13,7 @@ class BuscaImovelInput(BaseModel):
     quartos_min: Optional[int] = Field(default=None, ge=0)
     preco_min: Optional[float] = Field(default=None, ge=0)
     preco_max: Optional[float] = Field(default=None, ge=0)
-    limite_paginas: int = Field(default=2, ge=1, le=5)
+    limite_paginas: int = Field(default=2, ge=1, le=20)
 
 
 class AmostraMercado(BaseModel):

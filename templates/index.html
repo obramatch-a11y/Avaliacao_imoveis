@@ -426,7 +426,7 @@
                 <input id="amax" type="number" step="0.01" name="area_max" placeholder="120" inputmode="decimal" value="{{ filtros.get('area_max') or '' }}" /></div>
               <div class="f"><label for="qts">Quartos (mín.) · Páginas</label>
                 <div class="pair"><input id="qts" type="number" name="quartos_min" placeholder="Quartos" inputmode="numeric" value="{{ filtros.get('quartos_min') or '' }}" />
-                  <select name="limite_paginas" aria-label="Páginas">{% for n in [1, 2, 3] %}<option value="{{ n }}" {% if (filtros.get('limite_paginas') or 2) == n %}selected{% endif %}>{{ n }} pág.</option>{% endfor %}</select></div></div>
+                  <select name="limite_paginas" aria-label="Páginas">{% for n in [1, 2, 3, 5, 10, 20] %}<option value="{{ n }}" {% if (filtros.get('limite_paginas') or 2) == n %}selected{% endif %}>{{ n }} pág.{% if n > 3 %} (Chaves){% endif %}</option>{% endfor %}</select></div></div>
               <div class="f"><label for="pmin">Preço mínimo (R$)</label>
                 <input id="pmin" type="number" step="1000" name="preco_min" placeholder="200000" inputmode="numeric" value="{{ filtros.get('preco_min') | int if filtros.get('preco_min') else '' }}" /></div>
               <div class="f"><label for="pmax">Preço máximo (R$)</label>

@@ -331,7 +331,7 @@ class OLXScraper(BaseScraper):
         ) as client:
             modo = "caminho"
             pagina = 1
-            while pagina <= params.limite_paginas:
+            while pagina <= min(params.limite_paginas, 5):  # OLX: no máximo 5 páginas por coleta
                 if cancelado and cancelado():
                     self.diagnostico.append(f"Coleta interrompida antes da página {pagina}; resultados parciais mantidos.")
                     break
