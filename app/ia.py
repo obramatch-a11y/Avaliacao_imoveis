@@ -27,7 +27,8 @@ def disponivel() -> bool:
 
 
 def modelo() -> str:
-    return (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
+    m = (os.getenv("GEMINI_MODEL") or "gemini-flash-latest").strip()
+    return "gemini-flash-latest" if m == "gemini-2.5-flash" else m
 
 
 def _norm(s: str) -> str:
