@@ -355,12 +355,6 @@
   };
   IE.registrar("banco", "Banco local", IE.mod.banco);
 
-  /* ================= IA (em preparação) ================= */
-  IE.mod.ia = function (v) {
-    pagina(v, '<h2>Assistente de IA (BYOK) — em preparação</h2><div class="warnbox"><b>Este módulo ainda não está implementado:</b> nenhuma chamada de IA é feita, nenhuma chave é solicitada ou armazenada e nada é enviado a terceiros.</div><div class="card"><p>A plataforma é totalmente funcional sem IA. A integração opcional prevista usará a <b>sua própria chave</b> (BYOK), guardada só no seu navegador, para:</p><ul><li>extrair dados das descrições dos anúncios e normalizar informações;</li><li>apontar inconsistências e possíveis duplicidades;</li><li>sugerir variáveis e características aparentes em fotografias;</li><li>apoiar a documentação técnica.</li></ul><p>Regras que valerão quando for implementado: tudo o que a IA inferir será marcado como <b>inferido</b>, com incerteza, e dependerá da validação do avaliador; a IA <b>não</b> inventará valores, coordenadas ou características, e <b>não</b> substituirá cálculos estatísticos determinísticos nem a responsabilidade técnica.</p></div>');
-  };
-  IE.registrar("ia", "IA", IE.mod.ia, { breve: true });
-
   /* ordem final dos módulos */
   var ordem = ["projetos", "avaliando", "pesquisa", "base", "variaveis", "exploratoria", "matriz", "modelo", "geografia", "exportar", "banco", "ia"];
   IE.modulos.sort(function (a, b) { return ordem.indexOf(a.id) - ordem.indexOf(b.id); });
