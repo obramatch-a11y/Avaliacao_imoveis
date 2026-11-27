@@ -9,7 +9,7 @@ from fastapi import Body, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from app import conta
+from app import conta, ia
 from app.exporter import gerar_csv
 from app.models import AmostraMercado, BuscaImovelInput
 from app.normalizer import normalizar_registro_bruto
@@ -83,7 +83,7 @@ async def auth_config(request: Request):
     tem = bool(u and await conta.buscar_chave(u["sub"]))
     return {
         "login": conta.login_disponivel(), "client_id": conta.client_id() if conta.login_disponivel() else "",
-        "cofre": conta.cofre_disponivel(), "cofre_motivo": "ok" if conta.cofre_disponivel() else conta.motivo_sem_cofre(), "usuario": {"nome": u["nome"], "email": u["email"]} if u else None, "tem_chave": tem,
+        "cofre": conta.cofre_disponivel(), "ia_servidor": ia.disponivel(), "cofre_motivo": "ok" if conta.cofre_disponivel() else conta.motivo_sem_cofre(), "usuario": {"nome": u["nome"], "email": u["email"]} if u else None, "tem_chave": tem,
     }
 
 
@@ -127,6 +127,30 @@ async def auth_ia_gravar(request: Request, chave: str = Form(""), modelo: str = 
 async def auth_ia_remover(request: Request):
     u = usuario_da(request)
     return {"ok": bool(u and await conta.remover_extra(u["sub"]))}
+
+
+@app.post("/api/ia/extrair")
+async def api_ia_extrair(request: Request, corpo: dict = Body(...)):
+    """IA da plataforma para quem está logado e não tem chave própria. A chave do operador nunca é exposta."""
+    u = usuario_da(request)
+    if not u:
+        return JSONResponse({"erro": "Entre com o Google para usar a IA da plataforma."}, status_code=401)
+    if not ia.disponivel():
+        return JSONResponse({"erro": "A IA da plataforma não está ativada neste servidor."}, status_code=503)
+    texto = str(corpo.get("texto") or "").strip()
+    if len(texto) < 10 or len(texto) > ia.MAX_TEXTO:
+        return JSONResponse({"erro": f"Envie a descrição do anúncio (10 a {ia.MAX_TEXTO} caracteres)."}, status_code=422)
+    limite = ia.limite_ok(u["sub"])
+    if limite:
+        return JSONResponse({"erro": limite}, status_code=429)
+    try:
+        itens, rej = await ia.extrair(texto)
+    except RuntimeError as e:
+        msg = "A cota gratuita da IA está esgotada no momento. Tente mais tarde." if str(e) == "cota" else "A IA não respondeu como esperado. Tente novamente."
+        return JSONResponse({"erro": msg}, status_code=502)
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"erro": "Falha de rede ao consultar a IA."}, status_code=502)
+    return {"itens": itens, "rejeitados": rej, "modelo": ia.modelo()}
 
 
 @app.post("/auth/sair")
