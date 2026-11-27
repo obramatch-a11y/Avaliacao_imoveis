@@ -196,3 +196,33 @@ async def remover_chave(sub: str) -> bool:
         return bool(r is not None and r.status_code in (200, 404))
     except Exception:
         return False
+
+
+def motivo_sem_cofre() -> str:
+    """Explica, sem expor segredos, por que o cofre não está ativo (ajuda a corrigir a configuração)."""
+    if not login_disponivel():
+        return "login_nao_configurado"
+    bruto = (os.getenv("FIREBASE_SERVICE_ACCOUNT") or "").strip()
+    origem = "variavel" if bruto else ""
+    if not bruto:
+        for caminho in (os.getenv("FIREBASE_SERVICE_ACCOUNT_FILE") or "", "/etc/secrets/firebase.json"):
+            if caminho and os.path.isfile(caminho):
+                try:
+                    bruto, origem = open(caminho, encoding="utf-8").read().strip(), "arquivo"
+                except OSError:
+                    return "arquivo_ilegivel"
+                break
+    if not bruto:
+        return "sem_arquivo_nem_variavel"
+    try:
+        d = json.loads(bruto)
+    except ValueError:
+        return f"json_invalido_{origem}"
+    faltam = [k for k in ("client_email", "private_key", "project_id") if not d.get(k)]
+    if faltam:
+        return "campos_ausentes:" + ",".join(faltam)
+    try:
+        serialization.load_pem_private_key(d["private_key"].encode(), password=None)
+    except Exception:
+        return "chave_privada_invalida"
+    return "ok"

@@ -82,7 +82,7 @@ async def auth_config(request: Request):
     tem = bool(u and await conta.buscar_chave(u["sub"]))
     return {
         "login": conta.login_disponivel(), "client_id": conta.client_id() if conta.login_disponivel() else "",
-        "cofre": conta.cofre_disponivel(), "usuario": {"nome": u["nome"], "email": u["email"]} if u else None, "tem_chave": tem,
+        "cofre": conta.cofre_disponivel(), "cofre_motivo": "ok" if conta.cofre_disponivel() else conta.motivo_sem_cofre(), "usuario": {"nome": u["nome"], "email": u["email"]} if u else None, "tem_chave": tem,
     }
 
 
