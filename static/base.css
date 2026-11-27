@@ -73,3 +73,9 @@ svg.ch{width:100%;height:auto;display:block}svg.ch text{fill:var(--muted);font-s
 @media (max-width:900px){#bMenu{display:inline-block}.mods{display:none;position:absolute;top:var(--top);left:0;right:0;background:var(--petrol);flex-direction:column;padding:6px;z-index:50;margin:0}.mods.on{display:flex}
 .ws{grid-template-columns:1fr}.insp{position:fixed;right:0;top:var(--top);bottom:var(--bar);z-index:40;box-shadow:-8px 0 24px rgba(0,0,0,.3)}.projnome{width:120px}.save{display:none}}
 @media print{.top,.bar,.tool,.insp{display:none!important}body{display:block;overflow:visible;background:#fff}main{overflow:visible}.page{max-width:none}}
+@media (max-width:900px){
+  .sumario{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;white-space:nowrap}.sumario::-webkit-scrollbar{display:none}
+  .sumario>b{display:none}.sumario .kpis{flex-wrap:nowrap;margin-left:0!important}
+  .tool{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;white-space:nowrap}.tool::-webkit-scrollbar{display:none}
+  .tool input[type=search]{min-width:120px}
+}

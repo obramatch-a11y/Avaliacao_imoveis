@@ -290,15 +290,16 @@ def exploratoria(registros: list[dict], campos_numericos: list[str], campos_cate
 
 
 def registro_de_amostra(a) -> dict:
-    """AmostraMercado -> registro plano usado pela base, exploratória e modelagem (valores observados, sem inferências)."""
+    """AmostraMercado -> registro plano usado pela base, exploratória e modelagem (valores observados, sem inferências).
+    Zero/falso vindo do normalizador significa "não informado/não mencionado no anúncio", nunca "ausente": vira None."""
     d = a.model_dump() if hasattr(a, "model_dump") else dict(a)
     return {
         "id": d["id_amostra"], "fonte": d["fonte"], "data_coleta": d["data_coleta"], "natureza": "oferta",
         "uf": d["uf"], "cidade": d["cidade"], "bairro": d["bairro"], "tipo": d["tipo_imovel"], "finalidade": d["finalidade"],
         "valor_total": d["valor_oferta"], "area_privativa": d["area_m2"], "valor_unitario": d["valor_m2"],
-        "quartos": d["quartos"], "suites": d["suites"], "banheiros": d["banheiros"], "vagas": d["vagas"], "andar": d["andar"],
-        "condominio": d["condominio_rs"], "iptu": d["iptu_rs"], "elevador": d["elevador"], "piscina": d["piscina"],
-        "churrasqueira": d["churrasqueira"], "portaria_24h": d["portaria_24h"],
+        "quartos": d["quartos"], "suites": d["suites"] or None, "banheiros": d["banheiros"], "vagas": d["vagas"], "andar": d["andar"],
+        "condominio": d["condominio_rs"], "iptu": d["iptu_rs"], "elevador": d["elevador"] or None, "piscina": d["piscina"] or None,
+        "churrasqueira": d["churrasqueira"] or None, "portaria_24h": d["portaria_24h"] or None,
         "titulo": d["titulo_anuncio"], "url": d["url_anuncio"], "fotos": d["fotos"],
         "alerta": d["alerta_saneamento"], "fora_filtros": d["fora_filtros"], "motivos": d["motivos"], "completude": d["completude"],
     }

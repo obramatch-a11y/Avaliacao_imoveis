@@ -28,3 +28,13 @@ def test_xlsx_valido_e_escapado():
     r = c.post("/api/exportar/xlsx", json={"abas": [{"nome": "T", "cabecalho": ["a"], "linhas": [[1]]}]})
     assert r.status_code == 200 and r.content[:2] == b"PK"
     assert c.post("/api/exportar/xlsx", json={"abas": []}).status_code == 422
+
+
+def test_zero_do_normalizador_nao_vira_valor_observado():
+    from app.main import normalizar_lista
+    from app.models import BuscaImovelInput
+    from app.modelagem import registro_de_amostra
+    p = BuscaImovelInput(uf="PE", cidade="Recife", bairro="", finalidade="VENDA", tipo_imovel="APARTAMENTO", limite_paginas=1)  # type: ignore
+    a = normalizar_lista([{"titulo": "Apto", "preco": "R$ 500.000", "area": "80 m²", "quartos": "2"}], p)[0]
+    r = registro_de_amostra(a)
+    assert r["suites"] is None and r["elevador"] is None and r["piscina"] is None
