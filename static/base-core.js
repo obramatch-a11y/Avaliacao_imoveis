@@ -245,6 +245,7 @@ window.IE = window.IE || {};
   /* ------------------------------ banco permanente local ------------------------------ */
   IE.banco = {
     ler: function () { return lerJSON(K_BANCO, {}); },
+    gravar: function (b) { try { localStorage.setItem(K_BANCO, JSON.stringify(b)); return true; } catch (e) { return false; } },
     atualizar: function (p) {
       if (!p || !p.amostras || !p.amostras.length) return; var b = IE.banco.ler(), mudou = false, ref = (p.data_ref || (p.meta && p.meta.quando) || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
       p.amostras.forEach(function (a) {
