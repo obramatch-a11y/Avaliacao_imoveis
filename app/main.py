@@ -5,7 +5,7 @@ import json
 from fastapi.responses import JSONResponse
 from datetime import datetime
 from typing import Optional
-from fastapi import FastAPI, Form, Request
+from fastapi import Body, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from app import conta
@@ -463,6 +463,67 @@ async def executar_busca(
     ULTIMA_META.clear()
     ULTIMA_META.update({"params": params.model_dump(), "meta": meta})
     return _resposta_resultado(request, ULTIMA_COLETA, params, diag, None, meta)
+
+
+# ---------------------------------------------------------------------------------------------
+# API da estação de trabalho (cálculo sem estado: o servidor não guarda nada; o projeto fica com o usuário)
+# ---------------------------------------------------------------------------------------------
+
+def _registros_de(amostras) -> list[dict]:
+    from app.modelagem import registro_de_amostra
+    return [registro_de_amostra(a) for a in amostras]
+
+
+@app.get("/coleta/{job_id}/amostras.json")
+async def amostras_json(job_id: str):
+    j = JOBS.get(job_id)
+    if not j:
+        return JSONResponse({"erro": "Coleta não encontrada (o servidor reinicia e esquece coletas antigas; exporte o projeto para guardá-la)."}, status_code=404)
+    lista = j["resultado"] if j["resultado"] is not None else normalizar_lista(list(j["parcial"]), j["params"])
+    return {"id": job_id, "parametros": j["params"].model_dump(), "meta": _meta_coleta(j["inicio"], j["fontes"]), "estado": j["estado"],
+            "amostras": _registros_de(lista), "diagnostico": j.get("diagnostico", [])}
+
+
+@app.get("/api/amostras-atuais")
+async def amostras_atuais():
+    return {"parametros": ULTIMA_META.get("params", {}), "meta": ULTIMA_META.get("meta"), "amostras": _registros_de(ULTIMA_COLETA)}
+
+
+def _json_corpo(corpo) -> dict:
+    return corpo if isinstance(corpo, dict) else {}
+
+
+@app.post("/api/matriz")
+async def api_matriz(corpo: dict = Body(...)):
+    from app.modelagem import EspecificacaoInvalida, montar_matriz
+    try:
+        return montar_matriz(corpo.get("registros") or [], corpo.get("variaveis") or [], corpo.get("ids_usados"))
+    except EspecificacaoInvalida as e:
+        return JSONResponse({"erro": str(e)}, status_code=422)
+
+
+@app.post("/api/modelo")
+async def api_modelo(corpo: dict = Body(...)):
+    from app.modelagem import EspecificacaoInvalida, ajustar_modelo
+    try:
+        return ajustar_modelo(corpo.get("registros") or [], corpo.get("variaveis") or [], corpo.get("ids_usados"),
+                              corpo.get("avaliando"), float(corpo.get("nivel_confianca") or 0.80))
+    except (EspecificacaoInvalida, ValueError) as e:
+        return JSONResponse({"erro": str(e)}, status_code=422)
+
+
+@app.post("/api/exploratoria")
+async def api_exploratoria(corpo: dict = Body(...)):
+    from app.modelagem import exploratoria
+    return exploratoria(corpo.get("registros") or [], corpo.get("numericas") or [], corpo.get("categoricas") or [])
+
+
+@app.get("/api/suficiencia")
+async def api_suficiencia(n_coletados: int = 0, n_utilizaveis: int = 0, k: int = 0, n_ausentes: int = 0):
+    from app.estatistica import suficiencia
+    if min(n_coletados, n_utilizaveis, k, n_ausentes) < 0 or k > 100:
+        return JSONResponse({"erro": "valores inválidos"}, status_code=422)
+    return suficiencia(n_coletados, n_utilizaveis, k, n_ausentes)
 
 
 FOTOS_CACHE: dict[int, list[str]] = {}
