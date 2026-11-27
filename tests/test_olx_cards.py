@@ -264,3 +264,47 @@ def test_conta_de_servico_com_qualquer_nome_de_arquivo(monkeypatch, tmp_path):
     real = g.glob
     monkeypatch.setattr(g, "glob", lambda p: [str(f)] if p == "/etc/secrets/*.json" else real(p))
     assert conta._conta_servico()["project_id"] == "p"
+
+
+# ---------- diagnóstico medido (/debug-olx) ----------
+def test_diagnostico_classifica_bloqueio_e_sucesso():
+    import asyncio
+    import httpx
+    from app import diagnostico
+    from app.models import BuscaImovelInput
+
+    html_ok = ('<html><script id="__NEXT_DATA__" type="application/json">'
+               '{"props":{"pageProps":{"ads":[{"subject":"Apto","price":"R$ 300.000","listId":1,'
+               '"url":"https://pe.olx.com.br/x-1","images":[{"original":"https://img.olx.com.br/a.jpg"}],'
+               '"properties":[{"name":"size","value":"60m²"},{"name":"rooms","value":"2"}],'
+               '"location":{"neighbourhood":"Boa Viagem","municipality":"Recife"}}]}}}</script></html>')
+    html_bloq = "<html><title>Just a moment...</title><div id='challenge-platform'></div></html>"
+
+    def montar(corpo, status):
+        def h(request):
+            return httpx.Response(status, text=corpo, headers={"server": "cloudflare", "cf-ray": "abc"})
+        return httpx.MockTransport(h)
+
+    orig = httpx.AsyncClient
+    params = BuscaImovelInput(uf="PE", cidade="Recife", finalidade="VENDA", tipo_imovel="APARTAMENTO", limite_paginas=1)
+
+    async def rodar(corpo, status):
+        class C(orig):
+            def __init__(self, *a, **k):
+                k["transport"] = montar(corpo, status)
+                super().__init__(*a, **k)
+        diagnostico.httpx.AsyncClient = C
+        try:
+            return await diagnostico._uma_requisicao(diagnostico.OLXScraper(), "https://x/y", 5)
+        finally:
+            diagnostico.httpx.AsyncClient = orig
+
+    ok = asyncio.run(rodar(html_ok, 200))
+    assert ok["status"] == 200 and ok["next_data"] is True
+    assert ok["classificacao"] in ("OK_COM_ANUNCIOS", "200_SEM_ANUNCIOS_NA_BUSCA")
+    b403 = asyncio.run(rodar(html_bloq, 403))
+    assert b403["classificacao"] == "BLOQUEADO_403" and "cloudflare" in b403["sinais_bloqueio"] and b403["cf_ray"] is True
+    desafio = asyncio.run(rodar(html_bloq, 200))
+    assert desafio["classificacao"] == "200_COM_DESAFIO_ANTIBOT"
+    assert diagnostico._classificar(429, False, 0, [], None) == "LIMITE_DE_TAXA_429"
+    assert diagnostico._classificar(None, False, 0, [], "ConnectTimeout") == "ERRO_DE_REDE"

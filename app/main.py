@@ -301,36 +301,24 @@ async def home(request: Request):
 
 @app.get("/debug-olx")
 async def debug_olx(
+    request: Request,
     uf: str = "PE",
-    cidade: str = "Jaboatão dos Guararapes",
+    cidade: str = "Recife",
     bairro: str = "",
     tipo_imovel: str = "APARTAMENTO",
     finalidade: str = "VENDA",
 ):
-    """Diagnóstico: mostra o que o OLX devolveu e como o app leu os campos (1 página)."""
+    """Diagnóstico medido (JSON): código HTTP, tempo, bytes, dados estruturados e sinais de bloqueio.
+    Faz 1 requisição por canal, sem retentativas. Se a pessoa estiver logada com chave guardada, compara os canais."""
+    from app.diagnostico import diagnosticar
+
     params = BuscaImovelInput(
         uf=uf, cidade=cidade, bairro=bairro,
         finalidade=finalidade,  # type: ignore
         tipo_imovel=tipo_imovel,  # type: ignore
         limite_paginas=1,
     )
-    scraper = OLXScraper()
-    brutos = await scraper.buscar(params)
-    normalizados = normalizar_lista(brutos, params)
-
-    ULTIMA_COLETA = normalizados
-    validas = sum(1 for a in normalizados if a.alerta_saneamento == "OK")
-
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "amostras": normalizados,
-            "status_nbr": avaliar_grau_nbr14653(validas),
-            "filtros": params.model_dump(),
-            "diagnostico": scraper.diagnostico,
-        },
-    )
+    return JSONResponse(await diagnosticar(params, await chave_do_pedido(request)))
 
 
 @app.get("/buscar")
