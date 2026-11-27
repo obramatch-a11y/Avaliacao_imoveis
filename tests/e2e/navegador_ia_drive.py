@@ -25,8 +25,8 @@ with sync_playwright() as p:
     # IA
     pg.evaluate("IE.P.amostras[0].titulo='Lindo apto com 2 suítes, piscina e 3 vagas cobertas. Prédio novo.'"); 
     pg.evaluate("location.hash='ia'"); pg.wait_for_timeout(400)
-    pg.fill("#iaK","AIzaTESTE"); pg.click("#iaT"); pg.wait_for_selector("#iaS .chip.ok"); print("teste chave ok")
-    pg.click("#iaE"); pg.wait_for_selector("#iaR table"); rows=pg.locator("#iaR tbody tr").all_inner_texts(); print("sugestões:",len(rows)); print(pg.locator("#iaR .note").all_inner_texts())
+    pg.evaluate("document.querySelectorAll('details').forEach(d=>d.open=true)"); pg.fill("#iaK","AIzaTESTE"); pg.click("#iaT"); pg.wait_for_selector("#iaS .chip.ok"); print("teste chave ok")
+    pg.click("#iaE"); pg.wait_for_selector("#iaTodos"); print("sugestões:",pg.locator("#iaR button[data-i]").count()); print(pg.locator("#iaR .note").all_inner_texts())
     pg.click('#iaR button[data-i="0"]'); print("suites aplicado:",pg.evaluate("IE.P.amostras[0].suites"), pg.evaluate("IE.P.amostras[0].hist.slice(-1)[0].tipo"))
     print("chave só local:", pg.evaluate("!!localStorage.getItem('ie2-ia')"))
     # Drive
