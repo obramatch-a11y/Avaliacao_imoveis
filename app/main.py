@@ -133,7 +133,29 @@ async def validar_chave(request: Request, chave: str = Form("")):
     return {"ok": True, "restantes": j.get("remained_credits"), "total": j.get("plan_total_credits"), "na_conta": guardada}
 templates = Jinja2Templates(directory="templates")
 
+
+def _brl(v) -> str:
+    """1234567.0 -> '1.234.567' (sem casas decimais; valores monetários inteiros em reais)."""
+    try:
+        return f"{round(float(v)):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "–"
+
+
+def _num(v) -> str:
+    """98.0 -> '98'; 52.68 -> '52,68'."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return "–"
+    return (f"{f:.2f}".rstrip("0").rstrip(".")).replace(".", ",")
+
+
+templates.env.filters["brl"] = _brl
+templates.env.filters["num"] = _num
+
 ULTIMA_COLETA: list[AmostraMercado] = []
+ULTIMA_META: dict = {}  # parâmetros e metadados da coleta que gerou ULTIMA_COLETA (nunca mostrar amostras sem eles)
 
 
 def avaliar_grau_nbr14653(total_validas: int) -> str:
@@ -174,7 +196,14 @@ def normalizar_lista(brutos: list[dict], params: BuscaImovelInput) -> list[Amost
     return normalizados
 
 
-def _resposta_resultado(request: Request, normalizados, params, diagnostico, coleta_ativa=None):
+def _meta_coleta(inicio: float, fontes: list[str]) -> dict:
+    import time as _time
+    nomes = {"olx": "OLX", "chaves": "Chaves na Mão"}
+    return {"quando": _time.strftime("%d/%m %H:%M", _time.gmtime(inicio - 3 * 3600)),  # horário de Brasília
+            "fontes": " + ".join(nomes.get(f, f) for f in fontes)}
+
+
+def _resposta_resultado(request: Request, normalizados, params, diagnostico, coleta_ativa=None, meta=None):
     validas = sum(1 for a in normalizados if a.alerta_saneamento == "OK")
     return templates.TemplateResponse(
         "index.html",
@@ -185,6 +214,7 @@ def _resposta_resultado(request: Request, normalizados, params, diagnostico, col
             "filtros": params.model_dump(),
             "diagnostico": diagnostico,
             "coleta_ativa": coleta_ativa,
+            "meta": meta,
         },
     )
 
@@ -283,8 +313,10 @@ async def resultado_coleta(request: Request, job_id: str):
         diag, ativa = [], {"id": job_id, "n": j["encontrados"]}
     else:
         return RedirectResponse("/", status_code=303)
-    resp = _resposta_resultado(request, ULTIMA_COLETA, j["params"], diag, ativa)
-    return resp
+    meta = _meta_coleta(j["inicio"], j["fontes"])
+    ULTIMA_META.clear()
+    ULTIMA_META.update({"params": j["params"].model_dump(), "meta": meta})
+    return _resposta_resultado(request, ULTIMA_COLETA, j["params"], diag, ativa, meta)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -299,7 +331,9 @@ async def home(request: Request):
             )
             if ULTIMA_COLETA
             else None,
-            "filtros": {},
+            # amostras sempre acompanhadas dos parâmetros da coleta que as gerou (antes: filtros vazios)
+            "filtros": ULTIMA_META.get("params", {}) if ULTIMA_COLETA else {},
+            "meta": ULTIMA_META.get("meta") if ULTIMA_COLETA else None,
         },
     )
 
@@ -422,9 +456,13 @@ async def executar_busca(
         limite_paginas=limite_paginas,
     )
 
+    import time as _t
     brutos, diag = await coletar_fontes(params, fontes)
     ULTIMA_COLETA = normalizar_lista(brutos, params)
-    return _resposta_resultado(request, ULTIMA_COLETA, params, diag)
+    meta = _meta_coleta(_t.time(), fontes)
+    ULTIMA_META.clear()
+    ULTIMA_META.update({"params": params.model_dump(), "meta": meta})
+    return _resposta_resultado(request, ULTIMA_COLETA, params, diag, None, meta)
 
 
 FOTOS_CACHE: dict[int, list[str]] = {}

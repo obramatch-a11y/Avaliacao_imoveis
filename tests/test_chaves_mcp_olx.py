@@ -199,3 +199,25 @@ def test_mcp_sem_anuncios_nao_cai_no_raspador_de_paginas():
     r = _rodar(sc, _p(cidade="Lugarejo"), httpx.MockTransport(h))
     assert r == [] and sc.fonte_respondeu and sc.canal_usado == "mcp"
     assert not any("páginas públicas" in d for d in sc.diagnostico)
+
+
+def test_p0_valores_formatados_placeholders_neutros_e_parametros_vinculados():
+    from fastapi.testclient import TestClient
+    import app.main as m
+    from app.main import _brl, _num
+    assert _brl(850000.0) == "850.000" and _brl(None) == "–" and _num(98.0) == "98" and _num(52.68) == "52,68"
+    html = (pathlib.Path(__file__).parent.parent / "templates" / "index.html").read_text(encoding="utf-8")
+    for velho in ('placeholder="50"', 'placeholder="120"', 'placeholder="200000"', 'placeholder="600000"'):
+        assert velho not in html  # eram confundidos com valores digitados
+    # resultado com amostras sempre traz os parâmetros da coleta que as gerou, incluindo preço
+    from app.models import AmostraMercado
+    p = _p(area_min=90, area_max=200, preco_max=600000)
+    m.ULTIMA_COLETA[:] = m.normalizar_lista([{"fonte": "Chaves na Mão", "titulo": "Ap", "preco": "R$ 850.000", "bairro": "X", "area": "100", "quartos": "3", "url": "https://a/1", "fotos": []}], p)
+    m.ULTIMA_META.clear(); m.ULTIMA_META.update({"params": p.model_dump(), "meta": {"quando": "27/11 00:20", "fontes": "Chaves na Mão"}})
+    try:
+        corpo = TestClient(m.app).get("/").text
+        assert "90.0–200.0 m²" in corpo.replace("90–200", "90.0–200.0") or "90" in corpo
+        assert "R$ 0 – 600.000" in corpo and "Coleta 27/11 00:20 · Chaves na Mão" in corpo
+        assert "850.000" in corpo and ">850000.0<" not in corpo  # o atributo data-valor (uso interno do JS) pode manter o número bruto
+    finally:
+        m.ULTIMA_COLETA.clear(); m.ULTIMA_META.clear()

@@ -403,6 +403,8 @@
           <span class="pill">{{ filtros.get('cidade') }}{% if filtros.get('bairro') %} · {{ filtros.get('bairro') }}{% endif %} · {{ filtros.get('uf') }}</span>
           {% if filtros.get('area_min') or filtros.get('area_max') %}<span class="pill num">{{ filtros.get('area_min') or '0' }}–{{ filtros.get('area_max') or '∞' }} m²</span>{% endif %}
           {% if filtros.get('quartos_min') %}<span class="pill">≥ {{ filtros.get('quartos_min') }} quartos</span>{% endif %}
+          {% if filtros.get('preco_min') or filtros.get('preco_max') %}<span class="pill num">R$ {{ (filtros.get('preco_min') or 0)|brl }} – {{ (filtros.get('preco_max')|brl) if filtros.get('preco_max') else '∞' }}</span>{% endif %}
+          {% if meta %}<span class="pill" title="Parâmetros usados nesta coleta. Ficam registrados e não mudam; para outra busca, use Editar parâmetros.">Coleta {{ meta.quando }} · {{ meta.fontes }}</span>{% endif %}
           <span class="grow"></span>
           <button class="btn" type="button" id="bEditar" aria-expanded="false">Editar parâmetros</button>
         </div>
@@ -421,16 +423,16 @@
               <div class="f"><label for="fin">Finalidade</label>
                 <select id="fin" name="finalidade"><option value="VENDA" {% if filtros.get('finalidade') == 'VENDA' %}selected{% endif %}>Venda (oferta)</option><option value="LOCACAO" {% if filtros.get('finalidade') == 'LOCACAO' %}selected{% endif %}>Locação (oferta)</option></select></div>
               <div class="f"><label for="amin">Área mínima (m²)</label>
-                <input id="amin" type="number" step="0.01" name="area_min" placeholder="50" inputmode="decimal" value="{{ filtros.get('area_min') or '' }}" /></div>
+                <input id="amin" type="number" step="0.01" name="area_min" placeholder="mín." inputmode="decimal" value="{{ filtros.get('area_min') or '' }}" /></div>
               <div class="f"><label for="amax">Área máxima (m²)</label>
-                <input id="amax" type="number" step="0.01" name="area_max" placeholder="120" inputmode="decimal" value="{{ filtros.get('area_max') or '' }}" /></div>
+                <input id="amax" type="number" step="0.01" name="area_max" placeholder="máx." inputmode="decimal" value="{{ filtros.get('area_max') or '' }}" /></div>
               <div class="f"><label for="qts">Quartos (mín.) · Páginas</label>
                 <div class="pair"><input id="qts" type="number" name="quartos_min" placeholder="Quartos" inputmode="numeric" value="{{ filtros.get('quartos_min') or '' }}" />
                   <select name="limite_paginas" aria-label="Páginas">{% for n in [1, 2, 3, 5, 10, 20] %}<option value="{{ n }}" {% if (filtros.get('limite_paginas') or 2) == n %}selected{% endif %}>{{ n }} pág.{% if n > 3 %} (Chaves){% endif %}</option>{% endfor %}</select></div></div>
               <div class="f"><label for="pmin">Preço mínimo (R$)</label>
-                <input id="pmin" type="number" step="1000" name="preco_min" placeholder="200000" inputmode="numeric" value="{{ filtros.get('preco_min') | int if filtros.get('preco_min') else '' }}" /></div>
+                <input id="pmin" type="number" step="1000" name="preco_min" placeholder="sem mínimo" inputmode="numeric" value="{{ filtros.get('preco_min') | int if filtros.get('preco_min') else '' }}" /></div>
               <div class="f"><label for="pmax">Preço máximo (R$)</label>
-                <input id="pmax" type="number" step="1000" name="preco_max" placeholder="600000" inputmode="numeric" value="{{ filtros.get('preco_max') | int if filtros.get('preco_max') else '' }}" /></div>
+                <input id="pmax" type="number" step="1000" name="preco_max" placeholder="sem máximo" inputmode="numeric" value="{{ filtros.get('preco_max') | int if filtros.get('preco_max') else '' }}" /></div>
               <fieldset class="f" style="grid-column:1/-1;border:0;padding:0;margin:0;display:flex;gap:16px;flex-wrap:wrap;align-items:center"><legend class="sr">Fontes</legend>
                 <span style="font-size:12px;font-weight:600;color:var(--muted)">Fontes:</span>
                 <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="fonteTodas" checked> Todas as fontes</label>
@@ -541,9 +543,9 @@
                 <td class="ft"></td>
                 <td>{% if a.fora_filtros %}<span class="tag fora" title="{{ a.motivos|join('. ') }}">Fora dos filtros</span>{% elif a.alerta_saneamento == 'OK' %}<span class="tag ok" title="{{ a.motivos|join('. ') }}">{{ 'Compatível' if not a.motivos else 'Compatível*' }}</span>{% else %}<span class="tag warn">{{ 'Possível outlier' if a.alerta_saneamento == 'POSSIVEL_OUTLIER' else (a.alerta_saneamento|replace('_', ' ')|capitalize) }}</span>{% endif %}</td>
                 <td>{% if a.bairro == 'NAO_INFORMADO' %}<span class="muted">Não informado</span>{% else %}{{ a.bairro }}{% endif %}</td>
-                <td class="n" data-f="valor"><strong>{{ a.valor_oferta or '–' }}</strong></td>
-                <td class="n" data-f="area">{{ a.area_m2 or '–' }}</td>
-                <td class="n" data-f="m2">{{ a.valor_m2 or '–' }}</td>
+                <td class="n" data-f="valor"><strong>{{ (a.valor_oferta|brl) if a.valor_oferta else '–' }}</strong></td>
+                <td class="n" data-f="area">{{ (a.area_m2|num) if a.area_m2 else '–' }}</td>
+                <td class="n" data-f="m2">{{ (a.valor_m2|brl) if a.valor_m2 else '–' }}</td>
                 <td class="n">{{ a.quartos if a.quartos is not none else '–' }}</td>
                 <td class="n">{{ a.banheiros if a.banheiros is not none else '–' }}</td>
                 <td class="n">{{ a.vagas }}</td>
