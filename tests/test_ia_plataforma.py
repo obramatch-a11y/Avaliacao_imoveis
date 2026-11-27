@@ -60,3 +60,27 @@ def test_endpoint_fluxo_limite_e_segredo(monkeypatch):
     for _ in range(ia.POR_PESSOA_HORA):
         c.post("/api/ia/extrair", json={"texto": TXT})
     assert c.post("/api/ia/extrair", json={"texto": TXT}).status_code == 429
+
+
+def test_503_tenta_de_novo_e_usa_modelo_leve(monkeypatch):
+    import asyncio, json as _j
+    monkeypatch.setenv("GEMINI_API_KEY", "AIzaX" * 5)
+    chamadas = []
+
+    async def sem_espera(_): return None
+    monkeypatch.setattr(asyncio, "sleep", sem_espera)
+
+    class R:
+        def __init__(self, s): self.status_code = s
+        def json(self): return {"candidates": [{"content": {"parts": [{"text": _j.dumps({"itens": [{"campo": "suites", "valor": 2, "evidencia": "2 suítes"}]})}]}}]}
+
+    class Cli:
+        def __init__(self, *a, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, url, headers=None, json=None):
+            chamadas.append(url)
+            return R(200 if "lite" in url else 503)
+    monkeypatch.setattr(httpx, "AsyncClient", Cli)
+    itens, rej = asyncio.run(ia.extrair(TXT))
+    assert itens[0]["campo"] == "suites" and len(chamadas) == 4 and "lite" in chamadas[-1]

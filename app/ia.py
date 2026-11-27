@@ -3,6 +3,7 @@
 Regras: exige login; só texto de anúncio (limite de tamanho); limite por pessoa e global (protege a cota gratuita);
 nenhuma sugestão é aceita sem trecho de evidência literal no texto; a chave nunca sai do servidor.
 """
+import asyncio
 import json
 import os
 import re
@@ -100,8 +101,15 @@ def validar_itens(texto: str, itens) -> tuple[list[dict], int]:
 async def extrair(texto: str) -> tuple[list[dict], int]:
     chave = (os.getenv("GEMINI_API_KEY") or "").strip()
     corpo = {"contents": [{"parts": [{"text": montar_prompt(texto)}]}], "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}}
-    async with httpx.AsyncClient(timeout=30.0) as cli:
-        r = await cli.post(f"https://generativelanguage.googleapis.com/v1beta/models/{modelo()}:generateContent", headers={"x-goog-api-key": chave}, json=corpo)
+    r = None
+    # 503 = alta demanda temporária: tenta de novo e, por fim, um modelo mais leve
+    for mdl, espera in ((modelo(), 0), (modelo(), 2.5), (modelo(), 2.5), ("gemini-flash-lite-latest", 1)):
+        if espera:
+            await asyncio.sleep(espera)
+        async with httpx.AsyncClient(timeout=30.0) as cli:
+            r = await cli.post(f"https://generativelanguage.googleapis.com/v1beta/models/{mdl}:generateContent", headers={"x-goog-api-key": chave}, json=corpo)
+        if r.status_code != 503:
+            break
     if r.status_code == 429:
         raise RuntimeError("cota")
     if r.status_code != 200:
