@@ -216,7 +216,7 @@ def _pular(motivo: str, robots: dict | None = None) -> dict:
 # ---- Chaves na Mão: servidor MCP oficial -------------------------------------------------------
 
 async def sonda_chaves_mcp(client: httpx.AsyncClient, params: BuscaImovelInput, robots_cache: dict) -> dict:
-    from app.scrapers.chaves_mcp import MCP_URL, ClienteMCP, MCPErro, filtros_do_pedido, itens_do_resultado
+    from app.scrapers.chaves_mcp import MCP_URL, ClienteMCP, MCPErro, argumentos_busca, itens_do_resultado
     from app.validacao import cobertura_percentual
 
     rb = await checar_robots(client, MCP_URL, robots_cache)
@@ -237,8 +237,18 @@ async def sonda_chaves_mcp(client: httpx.AsyncClient, params: BuscaImovelInput, 
         ferramentas = await mcp.listar_ferramentas()
         out["ferramentas"] = [f.get("name") for f in ferramentas]
         busca = next((f for f in ferramentas if f.get("name") == "search_realty_listings"), None)
-        out["esquema_search_realty_listings"] = json.dumps((busca or {}).get("inputSchema"), ensure_ascii=False)[:2500] if busca else None
-        r = await mcp.chamar("search_realty_listings", {"filters": filtros_do_pedido(params), "page": 1, "pageSize": 20})
+        esq = (busca or {}).get("inputSchema") or {}
+        out["esquema_resumo"] = {"campos_topo": list((esq.get("properties") or {}).keys()), "obrigatorios": esq.get("required"),
+                                 "additionalProperties": esq.get("additionalProperties"),
+                                 "campos_de_filters": list((((esq.get("properties") or {}).get("filters") or {}).get("properties") or {}).keys())}
+        out["esquema_search_realty_listings"] = json.dumps(esq, ensure_ascii=False)[:6000] if esq else None
+        try:
+            r = await mcp.chamar("search_realty_listings", argumentos_busca(params, 1))
+            out["chamada_usada"] = "com query+filters+page"
+        except MCPErro as e1:
+            out["erro_com_paginacao"] = str(e1)
+            r = await mcp.chamar("search_realty_listings", argumentos_busca(params, 1, com_paginacao=False))
+            out["chamada_usada"] = "com query+filters (sem page/pageSize)"
         itens, total, formato = itens_do_resultado(r)
         textos = [c.get("text", "") for c in (r.get("content") or []) if isinstance(c, dict)]
         out.update({

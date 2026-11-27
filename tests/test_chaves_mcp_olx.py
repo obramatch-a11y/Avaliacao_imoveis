@@ -63,6 +63,8 @@ def _servidor(modo="json", falha=None):
         if corpo["method"] == "initialize":
             return httpx.Response(200, json={"jsonrpc": "2.0", "id": corpo["id"], "result": {"protocolVersion": "2025-03-26", "serverInfo": {"name": "chaves"}}},
                                   headers={"mcp-session-id": "S1"})
+        if not corpo["params"]["arguments"].get("query"):
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": corpo["id"], "error": {"code": -32602, "message": "Ferramenta inválida argumentos"}})
         pagina = corpo["params"]["arguments"].get("page", 1)
         itens = [{"title": f"Apto {pagina}-{i}", "price": 300000 + i, "location": {"neighborhood": "Boa Viagem", "city": "Recife"},
                   "bedrooms": 2, "area": 60, "url": f"https://www.chavesnamao.com.br/imovel/p{pagina}-{i}"} for i in range(20 if pagina == 1 else 3)]

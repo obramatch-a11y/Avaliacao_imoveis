@@ -380,6 +380,7 @@ async def validacao_nacional(iniciar: int = 0, cidades: str = "", tipo_imovel: s
         if tipo_imovel not in ("APARTAMENTO", "CASA", "TERRENO", "COMERCIAL") or finalidade not in ("VENDA", "LOCACAO"):
             return JSONResponse({"erro": "parâmetros inválidos"}, status_code=400)
         _VALIDACAO.clear()
+        _VALIDACAO.update({"estado": "rodando", "inicio": _t.time(), "concluidas": 0, "total": len(lista), "cidades": []})
         _VALIDACAO["tarefa"] = asyncio.create_task(validar(_VALIDACAO, lista, tipo_imovel, finalidade, max(1, min(paginas, 5))))
     return JSONResponse({k: v for k, v in _VALIDACAO.items() if k != "tarefa"})
 

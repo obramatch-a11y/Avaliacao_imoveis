@@ -101,7 +101,7 @@ class ClienteMCP:
             raise MCPErro(f"resposta sem mensagem JSON-RPC ({resp.headers.get('content-type', '')}): {(resp.text or '')[:160]}", "protocolo")
         if "error" in msg:
             e = msg["error"] or {}
-            raise MCPErro(f"JSON-RPC {e.get('code')}: {str(e.get('message'))[:200]}", "ferramenta")
+            raise MCPErro(f"JSON-RPC {e.get('code')}: {str(e.get('message'))[:200]} {json.dumps(e.get('data'), ensure_ascii=False)[:600] if e.get('data') else ''}".strip(), "ferramenta")
         return msg.get("result") if isinstance(msg.get("result"), dict) else {"valor": msg.get("result")}
 
     async def iniciar(self) -> dict:
@@ -290,6 +290,25 @@ def filtros_do_pedido(params: BuscaImovelInput) -> dict:
     return f
 
 
+def argumentos_busca(params: BuscaImovelInput, pagina: int, com_paginacao: bool = True) -> dict:
+    """O esquema real do servidor exige `query` (texto livre, 1-200 caracteres); os filtros estruturados prevalecem sobre ela."""
+    tipo = TIPOS.get(params.tipo_imovel, "apartamento")
+    local = " ".join(x for x in (params.bairro.strip(), params.cidade.strip(), params.uf.upper()) if x)
+    a: dict = {"query": f"{tipo} {local}"[:200], "filters": filtros_do_pedido(params)}
+    if com_paginacao:
+        a.update({"page": pagina, "pageSize": TAMANHO_MAX})
+    return a
+
+
+async def chamar_busca(mcp: "ClienteMCP", params: BuscaImovelInput, pagina: int) -> dict:
+    try:
+        return await mcp.chamar("search_realty_listings", argumentos_busca(params, pagina))
+    except MCPErro as e:
+        if e.categoria == "ferramenta" and "-32602" in str(e):
+            return await mcp.chamar("search_realty_listings", argumentos_busca(params, pagina, com_paginacao=False))
+        raise
+
+
 # ---- raspador no formato do app -----------------------------------------------------------------
 
 class ChavesNaMaoMCPScraper(OLXScraper):
@@ -332,13 +351,12 @@ class ChavesNaMaoMCPScraper(OLXScraper):
             if e.categoria in ("conexao", "bloqueio"):
                 raise
             # servidor sem estado: segue direto para a chamada
-        filtros = filtros_do_pedido(params)
         paginas = min(params.limite_paginas, PAGINA_MAX)
         for pagina in range(1, paginas + 1):
             if cancelado and cancelado():
                 self.diagnostico.append(f"Coleta interrompida antes da página {pagina}.")
                 break
-            r = await mcp.chamar("search_realty_listings", {"filters": filtros, "page": pagina, "pageSize": TAMANHO_MAX})
+            r = await chamar_busca(mcp, params, pagina)
             itens, total, formato = itens_do_resultado(r)
             if total is not None:
                 self.total_declarado = total
