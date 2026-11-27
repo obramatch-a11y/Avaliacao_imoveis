@@ -41,6 +41,7 @@ class AmostraMercado(BaseModel):
     portaria_24h: int = 0
     alerta_saneamento: str = "OK"
     titulo_anuncio: str = ""
+    descricao_anuncio: str = ""
     url_anuncio: str = ""
     fotos: list[str] = Field(default_factory=list)
     fora_filtros: bool = False

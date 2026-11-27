@@ -300,6 +300,6 @@ def registro_de_amostra(a) -> dict:
         "quartos": d["quartos"], "suites": d["suites"] or None, "banheiros": d["banheiros"], "vagas": d["vagas"], "andar": d["andar"],
         "condominio": d["condominio_rs"], "iptu": d["iptu_rs"], "elevador": d["elevador"] or None, "piscina": d["piscina"] or None,
         "churrasqueira": d["churrasqueira"] or None, "portaria_24h": d["portaria_24h"] or None,
-        "titulo": d["titulo_anuncio"], "url": d["url_anuncio"], "fotos": d["fotos"],
+        "titulo": d["titulo_anuncio"], "descricao": d.get("descricao_anuncio") or "", "url": d["url_anuncio"], "fotos": d["fotos"],
         "alerta": d["alerta_saneamento"], "fora_filtros": d["fora_filtros"], "motivos": d["motivos"], "completude": d["completude"],
     }

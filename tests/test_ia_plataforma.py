@@ -84,3 +84,14 @@ def test_503_tenta_de_novo_e_usa_modelo_leve(monkeypatch):
     monkeypatch.setattr(httpx, "AsyncClient", Cli)
     itens, rej = asyncio.run(ia.extrair(TXT))
     assert itens[0]["campo"] == "suites" and len(chamadas) == 4 and "lite" in chamadas[-1]
+
+
+def test_descricao_do_anuncio_chega_na_amostra():
+    from app.modelagem import registro_de_amostra
+    from app.normalizer import normalizar_registro_bruto
+    raw = {"titulo": "Apto Piedade", "descricao": "3 quartos, 2 vagas, piscina", "preco": "R$ 400.000", "area": "80", "detalhes": "x"}
+    a = normalizar_registro_bruto(1, raw, "PE", "Jaboatão dos Guararapes", "apartamento", "venda")
+    assert registro_de_amostra(a)["descricao"] == "3 quartos, 2 vagas, piscina"
+    raw["descricao"] = ""
+    a2 = normalizar_registro_bruto(2, raw, "PE", "Jaboatão dos Guararapes", "apartamento", "venda")
+    assert registro_de_amostra(a2)["descricao"] == ""

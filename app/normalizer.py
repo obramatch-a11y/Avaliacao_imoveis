@@ -157,6 +157,7 @@ def normalizar_registro_bruto(
         portaria_24h=portaria_24h,
         alerta_saneamento=alerta,
         titulo_anuncio=titulo[:140],
+        descricao_anuncio=descricao[:3000],
         url_anuncio=str(raw.get("url", "")),
         fotos=[f for f in (raw.get("fotos") or []) if isinstance(f, str)][:30],
     )

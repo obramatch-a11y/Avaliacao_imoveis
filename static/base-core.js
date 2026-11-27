@@ -143,7 +143,7 @@ window.IE = window.IE || {};
     var usar = !r.fora_filtros && r.alerta === "OK";
     var a = { id: r.id, fonte: r.fonte, data_coleta: r.data_coleta, natureza: r.natureza || "oferta", uf: r.uf, cidade: r.cidade, bairro: r.bairro === "NAO_INFORMADO" ? "" : r.bairro, tipo: r.tipo,
       finalidade: r.finalidade, valor_total: r.valor_total, area_privativa: r.area_privativa, quartos: r.quartos, suites: r.suites, banheiros: r.banheiros, vagas: r.vagas, andar: r.andar,
-      condominio: r.condominio, iptu: r.iptu, elevador: r.elevador, piscina: r.piscina, churrasqueira: r.churrasqueira, portaria_24h: r.portaria_24h, titulo: r.titulo, url: r.url,
+      condominio: r.condominio, iptu: r.iptu, elevador: r.elevador, piscina: r.piscina, churrasqueira: r.churrasqueira, portaria_24h: r.portaria_24h, titulo: r.titulo, descricao: r.descricao || "", url: r.url,
       fotos: r.fotos || [], _alerta: r.alerta, _fora: !!r.fora_filtros, _motivos: r.motivos || [], _compl: r.completude, usar: usar, estado_manual: null, justificativa: "", obs: "", _orig: {}, hist: [] };
     a.hist.push({ t: agora(), tipo: "coleta", nota: "Coletado de " + (r.fonte || "fonte") + (r.data_coleta ? " em " + r.data_coleta : "") });
     return a;

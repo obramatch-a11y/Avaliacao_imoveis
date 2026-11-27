@@ -227,7 +227,7 @@ def registro_de_item(d: dict) -> dict:
         "condominio": str(_chave(d, "condominio", "condoFee", "condominiumFee") or ""),
         "iptu": str(_chave(d, "iptu") or ""),
         "detalhes": f"{titulo} {texto_loc}".strip(),
-        "descricao": "",
+        "descricao": str(_chave(d, "description", "descricao", "descrição", "body", "text", "about") or "")[:3000],
         "url": url,
         "fotos": _fotos(d),
     }
