@@ -181,3 +181,21 @@ def test_validacao_nacional_segunda_chamada_nao_quebra():
                 break
         r = c.get("/validacao-nacional?iniciar=1")
         assert r.status_code == 200 and "tarefa" not in r.json()
+
+
+def test_mcp_sem_anuncios_nao_cai_no_raspador_de_paginas():
+    def h(req: httpx.Request) -> httpx.Response:
+        u = str(req.url)
+        if "well-known/search" in u:
+            return httpx.Response(200, text="0 anúncios encontrados; mostrando 0.\n")
+        corpo = json.loads(req.content)
+        if "id" not in corpo:
+            return httpx.Response(202)
+        if corpo["method"] == "initialize":
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": corpo["id"], "result": {"serverInfo": {}}})
+        res = {"content": [{"type": "text", "text": "Nenhum resultado"}], "structuredContent": {"resultados": [], "total": 0}}
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": corpo["id"], "result": res})
+    sc = ChavesNaMaoMCPScraper()
+    r = _rodar(sc, _p(cidade="Lugarejo"), httpx.MockTransport(h))
+    assert r == [] and sc.fonte_respondeu and sc.canal_usado == "mcp"
+    assert not any("páginas públicas" in d for d in sc.diagnostico)

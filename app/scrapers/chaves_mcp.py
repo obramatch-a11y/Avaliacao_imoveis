@@ -321,6 +321,7 @@ class ChavesNaMaoMCPScraper(OLXScraper):
         super().__init__(chave_api)
         self.canal_usado = ""
         self.total_declarado: int | None = None
+        self.fonte_respondeu = False  # um canal oficial respondeu de forma válida (mesmo que sem anúncios)
 
     async def buscar(self, params: BuscaImovelInput, ao_progredir=None, cancelado=None) -> list[dict]:
         coletados: list[dict] = []
@@ -338,7 +339,10 @@ class ChavesNaMaoMCPScraper(OLXScraper):
                         self.canal_usado = "well-known/search"
                 except Exception as e:  # noqa: BLE001
                     self.diagnostico.append(f"Busca oficial /.well-known/search indisponível ({type(e).__name__}).")
-        if not coletados:
+        if not coletados and self.fonte_respondeu:
+            self.canal_usado = self.canal_usado or "mcp"
+            self.diagnostico.append("Canal oficial respondeu: nenhum anúncio encontrado para este local (não é falha).")
+        if not coletados and not self.fonte_respondeu:
             legado = ChavesNaMaoScraper(self.chave_api)
             coletados = await legado.buscar(params, ao_progredir=ao_progredir, cancelado=cancelado)
             self.diagnostico += [f"(páginas públicas) {d}" for d in legado.diagnostico]
@@ -367,8 +371,15 @@ class ChavesNaMaoMCPScraper(OLXScraper):
                 self.debug["parser"].append(f"MCP: {formato}, {len(itens)} itens, total declarado {total}")
             if not itens:
                 if pagina == 1 and formato == "nao_reconhecido":
-                    raise MCPErro("formato de resposta não reconhecido", "protocolo")
+                    if isinstance(r.get("structuredContent"), (dict, list)):
+                        self.fonte_respondeu = True  # resposta estruturada válida, só sem anúncios para esta consulta
+                        self.diagnostico.append("MCP respondeu sem anúncios para esta consulta.")
+                    else:
+                        raise MCPErro("formato de resposta não reconhecido", "protocolo")
+                elif pagina == 1:
+                    self.fonte_respondeu = True
                 break
+            self.fonte_respondeu = True
             novos = 0
             for i in itens:
                 if i["url"] and i["url"] in vistos:
@@ -391,6 +402,8 @@ class ChavesNaMaoMCPScraper(OLXScraper):
         if resp.status_code != 200:
             raise MCPErro(f"HTTP {resp.status_code}", "http")
         itens, total, _ = itens_do_resultado({"content": [{"type": "text", "text": resp.text}]})
+        if "anúncios encontrados" in resp.text or itens:
+            self.fonte_respondeu = True
         self.total_declarado = total if total is not None else self.total_declarado
         for i in itens:
             if i["url"] not in vistos:
