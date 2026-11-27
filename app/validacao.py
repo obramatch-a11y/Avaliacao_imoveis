@@ -42,7 +42,7 @@ async def validar_cidade(uf: str, cidade: str, tipo: str, finalidade: str, pagin
         "anuncios_coletados": len(brutos), "com_valor_m2": len(m2),
         "valor_m2_mediana": round(statistics.median(m2)) if m2 else None,
         "valor_m2_min_max": [round(min(m2)), round(max(m2))] if m2 else None,
-        "alertas_de_saneamento": sum(1 for a in amostras if a.alerta_saneamento),
+        "alertas_de_saneamento": sum(1 for a in amostras if a.alerta_saneamento != "OK"),
         "cobertura_campos_pct": cobertura_percentual(brutos), **med,
         "erro": erro, "diagnostico": sc.diagnostico[:6],
         "classificacao": "FALHA" if erro else ("OK" if brutos else "SEM_ANUNCIOS_OU_NAO_LIDO"),
@@ -54,7 +54,11 @@ async def validar(estado: dict, cidades, tipo: str, finalidade: str, paginas: in
     estado.update({"estado": "rodando", "inicio": time.time(), "concluidas": 0, "total": len(cidades), "cidades": []})
     estado["ambiente_inicio"] = {"memoria_mb": _rss_mb(), "conteiner": _cgroup_mb()}
     for uf, cid in cidades:
-        estado["cidades"].append(await validar_cidade(uf, cid, tipo, finalidade, paginas))
+        try:
+            resultado = await validar_cidade(uf, cid, tipo, finalidade, paginas)
+        except Exception as exc:  # noqa: BLE001
+            resultado = {"uf": uf, "cidade": cid, "classificacao": "FALHA", "erro": f"{type(exc).__name__}: {str(exc)[:160]}", "tempo_ms": 0}
+        estado["cidades"].append(resultado)
         estado["concluidas"] += 1
         await asyncio.sleep(1.0)
     ok = [c for c in estado["cidades"] if c["classificacao"] == "OK"]
@@ -62,6 +66,6 @@ async def validar(estado: dict, cidades, tipo: str, finalidade: str, paginas: in
         "cidades_com_anuncios": len(ok), "cidades_testadas": len(estado["cidades"]),
         "tempo_total_s": round(time.time() - estado["inicio"], 1),
         "pico_memoria_processo_mb": _pico_mb(), "memoria_processo_fim_mb": _rss_mb(), "conteiner_fim": _cgroup_mb(),
-        "tempo_medio_por_cidade_ms": round(statistics.mean(c["tempo_ms"] for c in estado["cidades"])) if estado["cidades"] else None,
+        "tempo_medio_por_cidade_ms": round(statistics.mean(c.get("tempo_ms", 0) for c in estado["cidades"])) if estado["cidades"] else None,
     }
     estado["estado"] = "concluido"

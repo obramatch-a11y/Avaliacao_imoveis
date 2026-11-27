@@ -367,9 +367,9 @@ async def validacao_nacional(iniciar: int = 0, cidades: str = "", tipo_imovel: s
 
     if iniciar:
         if _VALIDACAO.get("estado") == "rodando":
-            return JSONResponse({**_VALIDACAO, "aviso": "já em andamento"})
+            return JSONResponse({**{k: v for k, v in _VALIDACAO.items() if k != "tarefa"}, "aviso": "já em andamento"})
         if _VALIDACAO.get("estado") == "concluido" and _t.time() - _VALIDACAO.get("inicio", 0) < 300:
-            return JSONResponse({**_VALIDACAO, "aviso": "resultado recente mantido por 5 minutos"})
+            return JSONResponse({**{k: v for k, v in _VALIDACAO.items() if k != "tarefa"}, "aviso": "resultado recente mantido por 5 minutos"})
         lista = []
         if cidades.strip():
             for par in cidades.split(";"):

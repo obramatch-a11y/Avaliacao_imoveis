@@ -165,3 +165,19 @@ def test_interface_tem_todas_as_fontes_e_nao_exige_chave():
     html = (pathlib.Path(__file__).parent.parent / "templates" / "index.html").read_text(encoding="utf-8")
     assert 'id="fonteTodas"' in html and 'value="olx"' in html and 'value="chaves"' in html
     assert "libere a importação primeiro" not in html
+
+
+def test_validacao_nacional_segunda_chamada_nao_quebra():
+    import time
+    from fastapi.testclient import TestClient
+    from app.main import app
+    with TestClient(app) as c:
+        assert c.get("/validacao-nacional?iniciar=1&cidades=Recife-PE").status_code == 200
+        r = c.get("/validacao-nacional?iniciar=1")  # repetir enquanto roda ou logo após concluir
+        assert r.status_code == 200 and "tarefa" not in r.json()
+        for _ in range(30):
+            time.sleep(1)
+            if c.get("/validacao-nacional").json().get("estado") == "concluido":
+                break
+        r = c.get("/validacao-nacional?iniciar=1")
+        assert r.status_code == 200 and "tarefa" not in r.json()
