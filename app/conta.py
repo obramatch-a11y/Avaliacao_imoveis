@@ -101,15 +101,29 @@ def decifrar(token: str) -> str | None:
 _TOKEN: dict = {"v": None, "exp": 0.0}
 
 
+def _arquivos_candidatos() -> list[str]:
+    """Qualquer .json em /etc/secrets (Secret Files do Render), seja qual for o nome do arquivo."""
+    import glob
+    lista = [os.getenv("FIREBASE_SERVICE_ACCOUNT_FILE") or "", "/etc/secrets/firebase.json"]
+    lista += sorted(glob.glob("/etc/secrets/*.json")) + sorted(glob.glob("/etc/secrets/*firebase*"))
+    vistos, saida = set(), []
+    for c in lista:
+        if c and c not in vistos:
+            vistos.add(c)
+            saida.append(c)
+    return saida
+
+
 def _conta_servico() -> dict | None:
     bruto = (os.getenv("FIREBASE_SERVICE_ACCOUNT") or "").strip()
     if not bruto:
         # Alternativa: "Secret File" do Render (arquivo firebase.json), sem precisar abrir ou copiar o conteúdo
-        for caminho in (os.getenv("FIREBASE_SERVICE_ACCOUNT_FILE") or "", "/etc/secrets/firebase.json"):
+        for caminho in _arquivos_candidatos():
             try:
-                if caminho and os.path.isfile(caminho):
+                if os.path.isfile(caminho):
                     bruto = open(caminho, encoding="utf-8").read().strip()
-                    break
+                    if bruto:
+                        break
             except OSError:
                 continue
     if not bruto:
@@ -205,7 +219,7 @@ def motivo_sem_cofre() -> str:
     bruto = (os.getenv("FIREBASE_SERVICE_ACCOUNT") or "").strip()
     origem = "variavel" if bruto else ""
     if not bruto:
-        for caminho in (os.getenv("FIREBASE_SERVICE_ACCOUNT_FILE") or "", "/etc/secrets/firebase.json"):
+        for caminho in _arquivos_candidatos():
             if caminho and os.path.isfile(caminho):
                 try:
                     bruto, origem = open(caminho, encoding="utf-8").read().strip(), "arquivo"

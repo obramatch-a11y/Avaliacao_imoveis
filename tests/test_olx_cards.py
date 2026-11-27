@@ -251,3 +251,16 @@ def test_conta_de_servico_por_arquivo_secreto(monkeypatch, tmp_path):
     assert conta._conta_servico()["project_id"] == "p"
     monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_FILE", str(tmp_path / "nao-existe.json"))
     assert conta._conta_servico() is None or isinstance(conta._conta_servico(), dict)
+
+
+def test_conta_de_servico_com_qualquer_nome_de_arquivo(monkeypatch, tmp_path):
+    import json
+    import glob as g
+    from app import conta
+    f = tmp_path / "avaliacao-imoveis-515922-firebase-adminsdk-fbsvc-abc.json"
+    f.write_text(json.dumps({"client_email": "a@b", "private_key": "k", "project_id": "p"}))
+    monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT", raising=False)
+    monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT_FILE", raising=False)
+    real = g.glob
+    monkeypatch.setattr(g, "glob", lambda p: [str(f)] if p == "/etc/secrets/*.json" else real(p))
+    assert conta._conta_servico()["project_id"] == "p"
