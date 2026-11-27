@@ -288,7 +288,8 @@
     /* Barra flutuante (vidro) */
     .fab { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 0); z-index: 45; display: flex; gap: 8px; align-items: center; padding: 8px 10px;
       background: var(--glass); backdrop-filter: saturate(1.4) blur(18px); -webkit-backdrop-filter: saturate(1.4) blur(18px);
-      border: 1px solid var(--glass-line); border-radius: 16px; box-shadow: var(--shadow-2); max-width: calc(100vw - 20px); flex-wrap: wrap; justify-content: center; }
+      border: 1px solid var(--glass-line); border-radius: 16px; box-shadow: var(--shadow-2); max-width: calc(100vw - 20px); flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
+    .fab .btn { white-space: nowrap; flex: 0 0 auto; }
     .fab[hidden] { display: none; }
     .fab .cnt { padding: 0 8px; font-weight: 650; white-space: nowrap; }
 
@@ -945,7 +946,12 @@
         S.sorted.forEach(function (x) { if (x < lo || x > hi) out += '<circle cx="' + X(x) + '" cy="' + y + '" r="3.5" fill="' + c.out + '"><title>R$ ' + nf0.format(x) + "/m²</title></circle>"; }); });
       svg.innerHTML = out; }
     function dispersao() {
-      var svg = $("#disp"); if (!svg) return; var pts = rows.filter(function (r) { return r.area != null && r.m2 != null; });
+      var svg = $("#disp"); if (!svg) return; var todos = rows.filter(function (r) { return r.area != null && r.m2 != null && r.st !== "fora"; });
+      /* A escala segue as amostras em uso; o que ficar muito fora dela não distorce o gráfico (é contado abaixo). Fora dos filtros nunca entra aqui. */
+      var base = todos.filter(function (r) { return r.cb.checked; }); if (base.length < 2) base = todos;
+      var qa = base.map(function (r) { return r.area; }).sort(function (x, y) { return x - y; }), qm = base.map(function (r) { return r.m2; }).sort(function (x, y) { return x - y; });
+      var lim = function (v, k) { if (v.length < 2) return [0, 1]; var d = v[v.length - 1] - v[0]; return [v[0] - d * k, v[v.length - 1] + d * k]; }, la = lim(qa, .6), lm = lim(qm, .6);
+      var pts = todos.filter(function (r) { return r.area >= la[0] && r.area <= la[1] && r.m2 >= lm[0] && r.m2 <= lm[1]; }), omitidos = todos.length - pts.length;
       var W = 640, H = 270, L = 66, R = 14, T = 14, B = 40, c = { on: cor("--pt-on"), off: cor("--pt-off"), out: cor("--pt-out"), sel: cor("--pt-sel"), gl: cor("--line"), tx: cor("--muted") }, out = "";
       if (pts.length < 2) { svg.innerHTML = '<text x="' + W / 2 + '" y="' + H / 2 + '" text-anchor="middle">Dados insuficientes</text>'; return; }
       var xs = pts.map(function (r) { return r.area; }), ys = pts.map(function (r) { return r.m2; });
@@ -957,6 +963,7 @@
       pts.slice().sort(function (a, b) { return (a.cb.checked ? 1 : 0) - (b.cb.checked ? 1 : 0); }).forEach(function (r) {
         var isSel = sel && sel.id === r.id, fill = !r.cb.checked ? c.off : r.st === "alerta" ? c.out : c.on, inBin = bin != null && BINS[bin] && BINS[bin].ids.indexOf(r.id) > -1;
         out += '<circle class="pt" data-id="' + r.id + '" cx="' + X(r.area) + '" cy="' + Y(r.m2) + '" r="' + (isSel ? 7 : inBin ? 6 : 4.5) + '" fill="' + fill + '" fill-opacity="' + (r.cb.checked ? .85 : .55) + '" stroke="' + (isSel ? c.sel : "none") + '" stroke-width="2"><title>' + esc(r.bairro) + " · " + nf2.format(r.area) + " m² · R$ " + nf0.format(r.m2) + "/m²</title></circle>"; });
+      if (omitidos > 0) out += '<text x="' + (W - R) + '" y="' + (T + 10) + '" text-anchor="end" fill="' + c.tx + '" font-size="11">' + omitidos + (omitidos === 1 ? " ponto muito fora da escala não aparece" : " pontos muito fora da escala não aparecem") + "</text>";
       svg.innerHTML = out;
     }
     function exportarPng(svgEl, nome, titulo) {
