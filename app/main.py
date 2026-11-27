@@ -321,6 +321,34 @@ async def debug_olx(
     return JSONResponse(await diagnosticar(params, await chave_do_pedido(request)))
 
 
+_DIAG_FONTES = {"t": 0.0, "res": None}
+
+
+@app.get("/diagnostico-fontes")
+async def diagnostico_fontes(uf: str = "PE", cidade: str = "Recife", tipo_imovel: str = "APARTAMENTO", finalidade: str = "VENDA"):
+    """Diagnóstico de fontes (somente leitura): mede, deste servidor, o que cada fonte devolve e quanto custa em memória/CPU.
+    Uma requisição por recurso, sem proxy e sem disfarce; respeita o robots.txt. Resultado guardado por 2 minutos para não
+    repetir pedidos às fontes."""
+    import time as _t
+    from app.diag_fontes import diagnosticar_fontes
+
+    if not re.fullmatch(r"[A-Za-z]{2}", uf) or not (2 <= len(cidade) <= 60) or tipo_imovel not in ("APARTAMENTO", "CASA", "TERRENO", "COMERCIAL") or finalidade not in ("VENDA", "LOCACAO"):
+        return JSONResponse({"erro": "parâmetros inválidos"}, status_code=400)
+    chave = (uf.upper(), cidade.strip().lower(), tipo_imovel, finalidade)
+    agora = _t.time()
+    c = _DIAG_FONTES
+    if c["res"] is not None and c.get("chave") == chave and agora - c["t"] < 120:
+        return JSONResponse({**c["res"], "do_cache_ha_segundos": int(agora - c["t"])})
+    if agora - c["t"] < 20:
+        return JSONResponse({"erro": "aguarde alguns segundos entre diagnósticos"}, status_code=429)
+    c["t"] = agora
+    params = BuscaImovelInput(uf=uf.upper(), cidade=cidade.strip(), bairro="", finalidade=finalidade,  # type: ignore
+                              tipo_imovel=tipo_imovel, limite_paginas=1)  # type: ignore
+    res = await diagnosticar_fontes(params)
+    c.update({"res": res, "chave": chave, "t": _t.time()})
+    return JSONResponse(res)
+
+
 @app.get("/buscar")
 async def buscar_get():
     return RedirectResponse(url="/", status_code=303)
