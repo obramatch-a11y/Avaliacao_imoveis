@@ -167,7 +167,7 @@ def _doc_url(d: dict, sub: str) -> str:
     return f"https://firestore.googleapis.com/v1/projects/{d['project_id']}/databases/(default)/documents/chaves_usuario/{sub}"
 
 
-async def _chamar(metodo: str, sub: str, corpo: dict | None = None):
+async def _chamar(metodo: str, sub: str, corpo: dict | None = None, params=None):
     d = _conta_servico()
     if not d or not sub.isdigit():
         return None
@@ -175,7 +175,7 @@ async def _chamar(metodo: str, sub: str, corpo: dict | None = None):
         tk = await _token_acesso(cli, d)
         if not tk:
             return None
-        return await cli.request(metodo, _doc_url(d, sub), headers={"Authorization": f"Bearer {tk}"}, json=corpo)
+        return await cli.request(metodo, _doc_url(d, sub), headers={"Authorization": f"Bearer {tk}"}, json=corpo, params=params)
 
 
 async def guardar_chave(sub: str, email: str, chave: str) -> bool:
@@ -184,7 +184,55 @@ async def guardar_chave(sub: str, email: str, chave: str) -> bool:
     try:
         r = await _chamar("PATCH", sub, {"fields": {
             "email": {"stringValue": email}, "chave_cifrada": {"stringValue": cifrar(chave)},
-            "atualizado": {"timestampValue": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}}})
+            "atualizado": {"timestampValue": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}}},
+            params=[("updateMask.fieldPaths", k) for k in ("email", "chave_cifrada", "atualizado")])
+        return bool(r is not None and r.status_code == 200)
+    except Exception:
+        return False
+
+
+CAMPOS_EXTRA = {"ia_chave_cifrada", "ia_modelo"}
+
+
+async def guardar_extra(sub: str, email: str, campos: dict[str, str]) -> bool:
+    """Grava campos extras (ex.: chave de IA, sempre cifrada) no documento do próprio usuário, sem tocar nos demais campos."""
+    if not cofre_disponivel() or not campos or not set(campos) <= CAMPOS_EXTRA:
+        return False
+    try:
+        corpo = {"fields": {"email": {"stringValue": email}, **{k: {"stringValue": v} for k, v in campos.items()}}}
+        mascara = [("updateMask.fieldPaths", k) for k in ["email", *campos]]
+        r = await _chamar("PATCH", sub, corpo, params=mascara)
+        return bool(r is not None and r.status_code == 200)
+    except Exception:
+        return False
+
+
+async def buscar_extra(sub: str) -> dict[str, str]:
+    if not cofre_disponivel():
+        return {}
+    try:
+        r = await _chamar("GET", sub)
+        if r is None or r.status_code != 200:
+            return {}
+        f = r.json().get("fields", {})
+        out = {}
+        if "ia_chave_cifrada" in f:
+            c = decifrar(f["ia_chave_cifrada"]["stringValue"])
+            if c:
+                out["ia_chave"] = c
+        if "ia_modelo" in f:
+            out["ia_modelo"] = f["ia_modelo"]["stringValue"]
+        return out
+    except Exception:
+        return {}
+
+
+async def remover_extra(sub: str) -> bool:
+    """Apaga só a chave de IA (mantém o resto do documento)."""
+    if not cofre_disponivel():
+        return False
+    try:
+        r = await _chamar("PATCH", sub, {"fields": {}}, params=[("updateMask.fieldPaths", "ia_chave_cifrada"), ("updateMask.fieldPaths", "ia_modelo")])
         return bool(r is not None and r.status_code == 200)
     except Exception:
         return False
@@ -206,7 +254,7 @@ async def remover_chave(sub: str) -> bool:
     if not cofre_disponivel():
         return False
     try:
-        r = await _chamar("DELETE", sub)
+        r = await _chamar("PATCH", sub, {"fields": {}}, params=[("updateMask.fieldPaths", "chave_cifrada")])
         return bool(r is not None and r.status_code in (200, 404))
     except Exception:
         return False

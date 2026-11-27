@@ -97,6 +97,38 @@ async def auth_google(credential: str = Form("")):
     return resp
 
 
+@app.get("/auth/ia")
+async def auth_ia_ler(request: Request):
+    """Chave de IA do próprio usuário logado (cifrada em repouso; só volta para a sessão dele)."""
+    u = usuario_da(request)
+    if not u:
+        return JSONResponse({"ok": False, "motivo": "sem_login"}, status_code=401)
+    if not conta.cofre_disponivel():
+        return {"ok": True, "cofre": False}
+    d = await conta.buscar_extra(u["sub"])
+    return JSONResponse({"ok": True, "cofre": True, "chave": d.get("ia_chave", ""), "modelo": d.get("ia_modelo", "")}, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/auth/ia")
+async def auth_ia_gravar(request: Request, chave: str = Form(""), modelo: str = Form("")):
+    u = usuario_da(request)
+    if not u:
+        return JSONResponse({"ok": False, "motivo": "sem_login"}, status_code=401)
+    chave, modelo = chave.strip(), modelo.strip()[:60]
+    if not (20 <= len(chave) <= 200) or " " in chave:
+        return JSONResponse({"ok": False, "erro": "Chave com formato inesperado."}, status_code=422)
+    campos = {"ia_chave_cifrada": conta.cifrar(chave)}
+    if modelo:
+        campos["ia_modelo"] = modelo
+    return {"ok": await conta.guardar_extra(u["sub"], u["email"], campos)}
+
+
+@app.post("/auth/ia/remover")
+async def auth_ia_remover(request: Request):
+    u = usuario_da(request)
+    return {"ok": bool(u and await conta.remover_extra(u["sub"]))}
+
+
 @app.post("/auth/sair")
 async def auth_sair():
     resp = JSONResponse({"ok": True})

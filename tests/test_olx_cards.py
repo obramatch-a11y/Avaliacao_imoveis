@@ -226,9 +226,14 @@ def test_cofre_firestore(monkeypatch):
         async def __aenter__(self): return self
         async def __aexit__(self, *a): return False
         async def post(self, url, **k): return R(200, {"access_token": "t", "expires_in": 3600})
-        async def request(self, metodo, url, headers=None, json=None):
+        async def request(self, metodo, url, headers=None, json=None, params=None):
             assert headers["Authorization"] == "Bearer t" and "/chaves_usuario/123" in url
-            if metodo == "PATCH": banco["d"] = json; return R(200)
+            if metodo == "PATCH":  # emula updateMask do Firestore: só os campos listados mudam
+                campos = {k: v for k, v in banco.get("d", {}).get("fields", {}).items()}
+                for _, nome in (params or []):
+                    campos.pop(nome, None)
+                    if nome in json["fields"]: campos[nome] = json["fields"][nome]
+                banco["d"] = {"fields": campos}; return R(200)
             if metodo == "GET": return R(200, banco["d"]) if "d" in banco else R(404)
             banco.pop("d", None); return R(200)
 

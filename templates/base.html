@@ -10,7 +10,7 @@
     (function () { try { var p = JSON.parse(localStorage.getItem("ie2-prefs") || "{}"); var t = p.tema || "auto";
       document.documentElement.setAttribute("data-theme", t === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t); } catch (e) {} })();
   </script>
-  <link rel="stylesheet" href="/static/base.css?v=5" />
+  <link rel="stylesheet" href="/static/base.css?v=6" />
 </head>
 <body>
   <header class="top" id="top">
@@ -18,6 +18,7 @@
     <div class="brand"><b>Inferência Estatística</b><span class="sep">/</span><input id="projNome" class="projnome" aria-label="Nome do projeto" value="Novo projeto" spellcheck="false"></div>
     <nav class="mods" id="mods" aria-label="Módulos"></nav>
     <div class="sp"></div>
+    <span id="bLogin" class="login" style="display:flex;align-items:center;gap:6px"></span>
     <span class="save" id="saveSt" title="Os dados do projeto ficam neste navegador (local-first)">—</span>
     <button class="ic" id="bTema" aria-label="Tema" title="Alternar tema">◐</button>
   </header>
@@ -25,9 +26,9 @@
   <footer class="bar" id="bar" aria-live="polite"></footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script>window.IE_BOOT = {{ boot|tojson }};</script>
-  <script src="/static/base-core.js?v=5"></script>
-  <script src="/static/base-grid.js?v=5"></script>
-  <script src="/static/base-modules.js?v=5"></script>
-  <script src="/static/base-nuvem.js?v=5"></script>
+  <script src="/static/base-core.js?v=6"></script>
+  <script src="/static/base-grid.js?v=6"></script>
+  <script src="/static/base-modules.js?v=6"></script>
+  <script src="/static/base-nuvem.js?v=6"></script>
 </body>
 </html>
