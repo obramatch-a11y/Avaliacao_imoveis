@@ -31,7 +31,8 @@ CABECALHOS_MCP = {
 }
 VERSAO_PROTOCOLO = "2025-03-26"
 PAGINA_MAX = 20
-TAMANHO_MAX = 20
+TAMANHO_MAX = 15  # limite real do servidor (esquema: pageSize máximo 15); page máximo 20 -> até 300 anúncios por consulta
+IMAGENS_BASE = "https://www.chavesnamao.com.br/imn/0640x0450/N/40/imoveis/"  # padrão observado na página pública do anúncio
 
 TIPOS = {"APARTAMENTO": "apartamento", "CASA": "casa", "TERRENO": "terreno", "COMERCIAL": "comercial"}
 TRANSACAO = {"VENDA": "venda", "LOCACAO": "aluguel"}
@@ -187,6 +188,8 @@ def _fotos(d: dict) -> list[str]:
             continue
         for el in (v if isinstance(v, list) else [v]):
             url = el.get("url") if isinstance(el, dict) else el
+            if isinstance(url, str) and url and not url.startswith("http") and re.match(r"^\d+/\d+/.+\.(jpe?g|png|webp)$", url):
+                url = IMAGENS_BASE + url  # o MCP devolve só o caminho relativo da foto
             if isinstance(url, str) and url.startswith("http") and url not in saida:
                 saida.append(url)
     return saida[:30]
@@ -205,7 +208,7 @@ def registro_de_item(d: dict) -> dict:
         bairro = texto_loc.split(",")[0].strip() if texto_loc else ""
     bairro = bairro or str(_chave(d, "neighborhood", "bairro") or "")
     area = _chave(d, "area", "areaM2", "area_m2", "usableArea", "area_util", "areaUtil", "size")
-    preco = _numero(_chave(d, "price", "preco", "preço", "valor", "amount"))
+    preco = _numero(_chave(d, "priceBRL", "price", "preco", "preço", "valor", "amount"))
     titulo = str(_chave(d, "title", "titulo", "título", "name") or "")
     url = str(_chave(d, "url", "link", "href") or "")
     quartos = _chave(d, "bedrooms", "quartos", "dormitorios")

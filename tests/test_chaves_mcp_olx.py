@@ -43,6 +43,15 @@ def test_resultado_structured_content_json_e_markdown():
     assert itens_do_resultado({"content": [{"type": "text", "text": "nada reconhecível"}]})[2] == "nao_reconhecido"
 
 
+def test_formato_real_observado_no_render():
+    r = {"structuredContent": {"resultados": [{"id": "45024961", "title": "Lindo apartamento", "url": "https://www.chavesnamao.com.br/imovel/x/id-45024961/",
+         "transaction": "venda", "propertyType": "Apartamento", "priceBRL": 700000, "location": {"city": "Recife", "state": "PE", "neighborhood": "Boa Viagem"},
+         "bedrooms": 3, "bathrooms": 3, "parkingSpots": 1, "areaM2": 98, "imageUrl": "1374104/45024961/pe-recife-a-6a639ec0-1.jpg"}]}}
+    it, _, fmt = itens_do_resultado(r)
+    assert fmt == "structuredContent" and it[0]["preco"] == "R$ 700.000" and it[0]["area"] == "98.0"
+    assert it[0]["fotos"] == ["https://www.chavesnamao.com.br/imn/0640x0450/N/40/imoveis/1374104/45024961/pe-recife-a-6a639ec0-1.jpg"]
+
+
 def _servidor(modo="json", falha=None):
     chamadas = []
 
@@ -67,8 +76,8 @@ def _servidor(modo="json", falha=None):
             return httpx.Response(200, json={"jsonrpc": "2.0", "id": corpo["id"], "error": {"code": -32602, "message": "Ferramenta inválida argumentos"}})
         pagina = corpo["params"]["arguments"].get("page", 1)
         itens = [{"title": f"Apto {pagina}-{i}", "price": 300000 + i, "location": {"neighborhood": "Boa Viagem", "city": "Recife"},
-                  "bedrooms": 2, "area": 60, "url": f"https://www.chavesnamao.com.br/imovel/p{pagina}-{i}"} for i in range(20 if pagina == 1 else 3)]
-        res = {"content": [{"type": "text", "text": json.dumps({"total": 23, "results": itens})}]}
+                  "bedrooms": 2, "area": 60, "url": f"https://www.chavesnamao.com.br/imovel/p{pagina}-{i}"} for i in range(15 if pagina == 1 else 3)]
+        res = {"content": [{"type": "text", "text": json.dumps({"total": 18, "results": itens})}]}
         msg = {"jsonrpc": "2.0", "id": corpo["id"], "result": res}
         if modo == "sse":
             return httpx.Response(200, text=f"event: message\ndata: {json.dumps(msg)}\n\n", headers={"content-type": "text/event-stream"})
@@ -106,7 +115,7 @@ def test_scraper_mcp_json_pagina_e_usa_sessao():
     t, chamadas = _servidor("json")
     sc = ChavesNaMaoMCPScraper()
     r = _rodar(sc, _p(limite_paginas=3), t)
-    assert sc.canal_usado == "mcp" and len(r) == 23 and sc.total_declarado == 23
+    assert sc.canal_usado == "mcp" and len(r) == 18 and sc.total_declarado == 18
     assert chamadas[:2] == ["initialize", "notifications/initialized"] and chamadas.count("tools/call") == 2  # página 2 veio incompleta
     assert r[0]["fonte"] == "Chaves na Mão"
 
@@ -115,7 +124,7 @@ def test_scraper_mcp_sse():
     t, _ = _servidor("sse")
     sc = ChavesNaMaoMCPScraper()
     r = _rodar(sc, _p(limite_paginas=1), t)
-    assert sc.canal_usado == "mcp" and len(r) == 20
+    assert sc.canal_usado == "mcp" and len(r) == 15
 
 
 def test_cai_para_busca_oficial_quando_mcp_cai():
