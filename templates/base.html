@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Base amostral — Pesquisa de mercado · Inferência Estatística</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 rx=%276%27 fill=%27%230b4a57%27/%3E%3C/svg%3E" />
+  <script>
+    (function () { try { var p = JSON.parse(localStorage.getItem("ie2-prefs") || "{}"); var t = p.tema || "auto";
+      document.documentElement.setAttribute("data-theme", t === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t); } catch (e) {} })();
+  </script>
+  <link rel="stylesheet" href="/static/base.css?v=1" />
+</head>
+<body>
+  <header class="top" id="top">
+    <button class="ic" id="bMenu" aria-label="Módulos" title="Módulos">☰</button>
+    <div class="brand"><b>Inferência Estatística</b><span class="sep">/</span><input id="projNome" class="projnome" aria-label="Nome do projeto" value="Novo projeto" spellcheck="false"></div>
+    <nav class="mods" id="mods" aria-label="Módulos"></nav>
+    <div class="sp"></div>
+    <span class="save" id="saveSt" title="Os dados do projeto ficam neste navegador (local-first)">—</span>
+    <button class="ic" id="bTema" aria-label="Tema" title="Alternar tema">◐</button>
+  </header>
+  <main id="view" tabindex="-1"></main>
+  <footer class="bar" id="bar" aria-live="polite"></footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script>window.IE_BOOT = {{ boot|tojson }};</script>
+  <script src="/static/base-core.js?v=1"></script>
+  <script src="/static/base-grid.js?v=1"></script>
+  <script src="/static/base-modules.js?v=1"></script>
+</body>
+</html>

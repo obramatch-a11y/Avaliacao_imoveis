@@ -56,7 +56,7 @@ def test_coleta_assincrona_com_cancelamento(monkeypatch):
                 break
             time.sleep(0.1)
         assert st["estado"] == "interrompida" and 1 <= st["encontrados"] < 3
-        assert "Apto 1" in c.get(f"/coleta/{jid}/resultado").text
+        assert "Apto 1" in c.get(f"/coleta/{jid}/resultado?legado=1").text
 
 
 def test_chaves_na_mao_cartao():
@@ -90,7 +90,7 @@ def test_resultado_parcial_enquanto_coleta_roda(monkeypatch):
     with TestClient(m.app) as c:
         jid = c.post("/coleta", data={"uf": "PE", "cidade": "Recife", "fontes": "olx"}).json()["id"]
         time.sleep(0.3)
-        html = c.get(f"/coleta/{jid}/resultado").text
+        html = c.get(f"/coleta/{jid}/resultado?legado=1").text
         assert "Coleta em andamento" in html and "Apto A" in html
         c.post(f"/coleta/{jid}/cancelar")
 

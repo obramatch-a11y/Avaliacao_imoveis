@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import Body, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from app import conta
 from app.exporter import gerar_csv
@@ -131,7 +132,8 @@ async def validar_chave(request: Request, chave: str = Form("")):
     u = usuario_da(request)
     guardada = await conta.guardar_chave(u["sub"], u["email"], c) if u else False
     return {"ok": True, "restantes": j.get("remained_credits"), "total": j.get("plan_total_credits"), "na_conta": guardada}
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=str(__import__("pathlib").Path(__file__).resolve().parent.parent / "templates"))
+app.mount("/static", StaticFiles(directory=str(__import__("pathlib").Path(__file__).resolve().parent.parent / "static")), name="static")
 
 
 def _brl(v) -> str:
@@ -300,7 +302,7 @@ async def cancelar_coleta(job_id: str):
 
 
 @app.get("/coleta/{job_id}/resultado", response_class=HTMLResponse)
-async def resultado_coleta(request: Request, job_id: str):
+async def resultado_coleta(request: Request, job_id: str, legado: int = 0):
     global ULTIMA_COLETA
     j = JOBS.get(job_id)
     if not j:
@@ -316,7 +318,26 @@ async def resultado_coleta(request: Request, job_id: str):
     meta = _meta_coleta(j["inicio"], j["fontes"])
     ULTIMA_META.clear()
     ULTIMA_META.update({"params": j["params"].model_dump(), "meta": meta})
+    if not legado:
+        return templates.TemplateResponse("base.html", {"request": request, "boot": {"coleta_id": job_id}})
     return _resposta_resultado(request, ULTIMA_COLETA, j["params"], diag, ativa, meta)
+
+
+@app.get("/base", response_class=HTMLResponse)
+async def estacao_base(request: Request):
+    return templates.TemplateResponse("base.html", {"request": request, "boot": {"coleta_id": None}})
+
+
+@app.post("/api/exportar/xlsx")
+async def api_exportar_xlsx(corpo: dict = Body(...)):
+    from fastapi.responses import Response
+    from app.xlsx_min import gerar_xlsx
+    abas = corpo.get("abas") or []
+    if not isinstance(abas, list) or not abas or len(abas) > 10:
+        return JSONResponse({"erro": "abas inválidas"}, status_code=422)
+    dados = gerar_xlsx(abas)
+    return Response(dados, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": 'attachment; filename="amostras.xlsx"'})
 
 
 @app.get("/", response_class=HTMLResponse)
