@@ -11,6 +11,7 @@ with sync_playwright() as p:
     pg.evaluate("IE.ia.cfg.chave=''; IE.P.amostras[0].titulo='Apartamento com 2 suítes e piscina grande'; location.hash='ia'"); pg.wait_for_timeout(600)
     print("aviso:", pg.locator("#iaConta").inner_text()[:90])
     pg.click("#iaE"); pg.wait_for_selector("#iaTodos"); print("cartoes:", pg.locator("#iaR button[data-i]").count()); pg.click("#iaR button[data-i=\"0\"]")
+    print("aviso gravou:", pg.locator(".gravou").count())
     print("suites:", pg.evaluate("IE.P.amostras[0].suites"), pg.evaluate("IE.P.amostras[0].hist.slice(-1)[0].nota")[:70])
     b.close()
 print("ERROS:",erros)
