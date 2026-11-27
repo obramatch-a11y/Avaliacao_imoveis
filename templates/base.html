@@ -10,7 +10,7 @@
     (function () { try { var p = JSON.parse(localStorage.getItem("ie2-prefs") || "{}"); var t = p.tema || "auto";
       document.documentElement.setAttribute("data-theme", t === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t); } catch (e) {} })();
   </script>
-  <link rel="stylesheet" href="/static/base.css?v=13" />
+  <link rel="stylesheet" href="/static/base.css?v=14" />
 </head>
 <body>
   <header class="top" id="top">
@@ -26,9 +26,9 @@
   <footer class="bar" id="bar" aria-live="polite"></footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script>window.IE_BOOT = {{ boot|tojson }};</script>
-  <script src="/static/base-core.js?v=13"></script>
-  <script src="/static/base-grid.js?v=13"></script>
-  <script src="/static/base-modules.js?v=13"></script>
-  <script src="/static/base-nuvem.js?v=13"></script>
+  <script src="/static/base-core.js?v=14"></script>
+  <script src="/static/base-grid.js?v=14"></script>
+  <script src="/static/base-modules.js?v=14"></script>
+  <script src="/static/base-nuvem.js?v=14"></script>
 </body>
 </html>

@@ -153,6 +153,65 @@ async def api_ia_extrair(request: Request, corpo: dict = Body(...)):
     return {"itens": itens, "rejeitados": rej, "modelo": ia.modelo()}
 
 
+def _ia_porta(request: Request):
+    """Login + chave do operador + limite por pessoa. Devolve (usuario, None) ou (None, resposta de erro)."""
+    u = usuario_da(request)
+    if not u:
+        return None, JSONResponse({"erro": "Entre com o Google para usar a IA da plataforma."}, status_code=401)
+    if not ia.disponivel():
+        return None, JSONResponse({"erro": "A IA da plataforma não está ativada neste servidor."}, status_code=503)
+    lim = ia.limite_ok(u["sub"])
+    if lim:
+        return None, JSONResponse({"erro": lim}, status_code=429)
+    return u, None
+
+
+def _ia_erro(e: Exception):
+    if isinstance(e, RuntimeError):
+        msg = "A cota gratuita da IA está esgotada no momento. Tente mais tarde." if str(e) == "cota" else "A IA não respondeu como esperado. Tente novamente."
+    else:
+        msg = "Falha de rede ao consultar a IA."
+    return JSONResponse({"erro": msg}, status_code=502)
+
+
+@app.post("/api/ia/fotos")
+async def api_ia_fotos(request: Request, corpo: dict = Body(...)):
+    """Lê até 3 fotos públicas de um anúncio e sugere conservação/padrão/piscina/varanda (tudo inferido)."""
+    urls = [x for x in (corpo.get("fotos") or []) if isinstance(x, str) and x.startswith("https://")][:3]
+    if not urls:
+        return JSONResponse({"erro": "Esta amostra não tem fotos públicas (https) para analisar."}, status_code=422)
+    u, erro = _ia_porta(request)
+    if erro:
+        return erro
+    try:
+        itens, obs, lidas = await ia.analisar_fotos(urls)
+    except Exception as e:  # noqa: BLE001
+        return _ia_erro(e)
+    if not lidas:
+        return JSONResponse({"erro": "Não consegui baixar as fotos deste anúncio (o site da foto pode bloquear leitores automáticos)."}, status_code=422)
+    return {"itens": itens, "observacoes": obs, "fotos_lidas": lidas, "modelo": ia.modelo()}
+
+
+@app.post("/api/ia/texto")
+async def api_ia_texto(request: Request, corpo: dict = Body(...)):
+    """Explica o modelo ou redige rascunho do laudo, a partir de NÚMEROS agregados (sem dados de cliente)."""
+    tipo = corpo.get("tipo")
+    dados = corpo.get("dados")
+    if tipo not in ("explicar", "laudo") or not isinstance(dados, (dict, list)):
+        return JSONResponse({"erro": "Pedido inválido."}, status_code=422)
+    import json as _json
+    if len(_json.dumps(dados, ensure_ascii=False)) > ia.MAX_DADOS:
+        return JSONResponse({"erro": "Dados grandes demais para enviar."}, status_code=422)
+    u, erro = _ia_porta(request)
+    if erro:
+        return erro
+    try:
+        texto, fora = await ia.gerar_texto(tipo, dados)
+    except Exception as e:  # noqa: BLE001
+        return _ia_erro(e)
+    return {"texto": texto, "numeros_fora": fora, "modelo": ia.modelo()}
+
+
 @app.post("/auth/sair")
 async def auth_sair():
     resp = JSONResponse({"ok": True})
